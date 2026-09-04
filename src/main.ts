@@ -14,6 +14,12 @@ import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { WebviewWindow, getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
+
+/** Die Bibliothek laeuft im Hauptfenster, jedes Dokument in einem
+ *  eigenen. Welche Rolle dieses Fenster hat, steht in der Adresse. */
+const DOC = new URLSearchParams(location.search).get("doc");
+const IS_READER = DOC !== null;
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -77,7 +83,10 @@ const PLUS = P('<path d="M12 5v14"/><path d="M5 12h14"/>');
 const win = getCurrentWindow();
 $<HTMLButtonElement>("w-min").addEventListener("click", () => void win.minimize());
 $<HTMLButtonElement>("w-max").addEventListener("click", () => void win.toggleMaximize());
-$<HTMLButtonElement>("w-close").addEventListener("click", () => void win.close());
+$<HTMLButtonElement>("w-close").addEventListener("click", async () => {
+  if (IS_READER && dirty && !(await askSave())) return;
+  await win.close();
+});
 
 // ---------- Zuletzt geoeffnet ----------
 
@@ -152,7 +161,7 @@ function renderHome() {
     name.textContent = r.name.replace(/\.pdf$/i, "");
 
     t.append(cover, name);
-    t.addEventListener("click", () => void openPath(r.path));
+    t.addEventListener("click", () => void openDoc(r.path));
     grid.appendChild(t);
   });
   glass?.invalidate();
@@ -317,12 +326,6 @@ async function makeThumb(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
   }
 }
 
-function showHome() {
-  reader.hidden = true;
-  home.hidden = false;
-  renderHome();
-}
-
 async function openPath(path: string) {
   try {
     const buf = await invoke<ArrayBuffer>("read_pdf", { path });
@@ -357,9 +360,50 @@ async function openPath(path: string) {
   }
 }
 
+/** Ein Fenster je Dokument. Label aus dem Pfad, damit dasselbe Dokument
+ *  nicht zweimal aufgeht - dann kommt das vorhandene nach vorn. */
+function labelFor(path: string) {
+  let h = 2166136261;
+  for (let i = 0; i < path.length; i++) {
+    h ^= path.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return "doc-" + h.toString(36);
+}
+
+async function openDoc(path: string) {
+  const label = labelFor(path);
+  const open = await WebviewWindow.getByLabel(label);
+  if (open) {
+    await open.unminimize().catch(() => {});
+    await open.setFocus();
+    return;
+  }
+  // Mehrere Dokumente sollen nicht deckungsgleich uebereinander liegen:
+  // jedes weitere Fenster rueckt eine Stufe nach unten rechts.
+  const W = 1180;
+  const H = 900;
+  const others = (await getAllWebviewWindows()).filter((x) => x.label.startsWith("doc-")).length;
+  const step = 34 * (others % 7);
+  const w = new WebviewWindow(label, {
+    url: "index.html?doc=" + encodeURIComponent(path),
+    title: path.split(/[\\/]/).pop() ?? "Folio",
+    width: W,
+    height: H,
+    minWidth: 520,
+    minHeight: 400,
+    x: Math.max(0, Math.round((screen.availWidth - W) / 2) + step),
+    y: Math.max(0, Math.round((screen.availHeight - H) / 2) + step),
+    decorations: false,
+    shadow: true,
+    dragDropEnabled: true,
+  });
+  w.once("tauri://error", (e) => say("Fenster ging nicht auf: " + String(e.payload)));
+}
+
 async function pick() {
   const sel = await openDialog({ multiple: false, filters: [{ name: "PDF", extensions: ["pdf"] }] });
-  if (typeof sel === "string") await openPath(sel);
+  if (typeof sel === "string") await openDoc(sel);
 }
 
 // ---------- Sichern ----------
@@ -483,11 +527,15 @@ function askSave(): Promise<boolean> {
   });
 }
 
+/** Zurueck heisst hier: dieses Dokumentfenster zu, Bibliothek nach vorn. */
 async function leaveReader() {
   if (dirty && !(await askSave())) return;
-  closeAnn();
-  closeFind();
-  showHome();
+  const lib = await WebviewWindow.getByLabel("main");
+  if (lib) {
+    await lib.unminimize().catch(() => {});
+    await lib.setFocus().catch(() => {});
+  }
+  await getCurrentWindow().close();
 }
 
 $<HTMLButtonElement>("b-home").addEventListener("click", () => void leaveReader());
@@ -742,14 +790,22 @@ void getCurrentWebview().onDragDropEvent((e) => {
   else if (e.payload.type === "drop") {
     document.body.classList.remove("dragging");
     const p = e.payload.paths.find((x) => x.toLowerCase().endsWith(".pdf"));
-    if (p) void openPath(p);
+    if (p) void openDoc(p);
   }
 });
 
-void listen<string>("folio://open", (e) => { if (e.payload) void openPath(e.payload); });
-
 // ---------- Start ----------
 
-renderHome();
-
-void invoke<string | null>("startup_file").then((p) => { if (p) void openPath(p); });
+if (IS_READER) {
+  home.remove();
+  void openPath(DOC as string);
+} else {
+  reader.remove();
+  renderHome();
+  // Die Bibliothek verteilt eintreffende Dateien an Dokumentfenster.
+  void listen<string>("folio://open", (e) => { if (e.payload) void openDoc(e.payload); });
+  void invoke<string | null>("startup_file").then((p) => { if (p) void openDoc(p); });
+  // Nach dem Schliessen eines Dokumentfensters kann sich die Seitenzahl
+  // geaendert haben - beim Zurueckkommen neu aufbauen.
+  window.addEventListener("focus", renderHome);
+}

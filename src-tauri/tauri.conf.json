@@ -14,8 +14,8 @@
     "windows": [
       {
         "title": "Folio",
-        "width": 1100,
-        "height": 800,
+        "width": 980,
+        "height": 660,
         "minWidth": 520,
         "minHeight": 400,
         "center": true,
