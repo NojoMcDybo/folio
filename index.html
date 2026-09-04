@@ -4,46 +4,53 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Folio</title>
-    <!-- styles.css wird in main.ts NACH pdf_viewer.css importiert,
-         sonst gewinnen bei gleicher Spezifitaet deren Regeln. -->
   </head>
   <body>
-    <header id="bar">
-      <button id="btn-open" title="Öffnen (Strg+O)">Öffnen</button>
-      <button id="btn-find" title="Suchen (Strg+F)">Suchen</button>
+    <!-- Brechungsfilter fuer die Glasflaechen. Verzerrt den Hintergrund an
+         den Raendern, damit es nach Glas aussieht und nicht nach Milchscheibe. -->
+    <svg width="0" height="0" aria-hidden="true">
+      <filter id="glass" x="-20%" y="-20%" width="140%" height="140%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.008 0.012" numOctaves="2" seed="7" result="noise" />
+        <feGaussianBlur in="noise" stdDeviation="3" result="soft" />
+        <feDisplacementMap in="SourceGraphic" in2="soft" scale="14" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
 
-      <span class="sep"></span>
+    <!-- ---------- Startseite ---------- -->
+    <main id="home">
+      <div id="grid"></div>
+    </main>
 
-      <div class="group" id="tools">
-        <button id="t-none" class="on" title="Auswahl (V)">Auswahl</button>
-        <button id="t-mark" title="Textmarker (M)">Marker</button>
-        <button id="t-ink" title="Zeichnen (Z)">Stift</button>
-        <button id="t-text" title="Textfeld (T)">Text</button>
+    <!-- ---------- Leser ---------- -->
+    <section id="reader" hidden>
+      <div id="container"><div id="viewer" class="pdfViewer"></div></div>
+
+      <div id="pagechip" class="glass chip"></div>
+
+      <div id="findbar" class="glass" hidden>
+        <input id="find-q" type="text" spellcheck="false" autocomplete="off" />
+        <span id="find-count"></span>
+        <button id="find-prev" class="ico" title="Zurück"></button>
+        <button id="find-next" class="ico" title="Weiter"></button>
+        <button id="find-close" class="ico" title="Schließen"></button>
       </div>
-      <input id="color" type="color" value="#ffd23f" title="Farbe" />
-      <button id="btn-save" title="Speichern (Strg+S)" disabled>Speichern</button>
 
-      <span class="grow"></span>
-      <span id="file"></span>
-      <span id="pages"></span>
-      <div class="group">
-        <button id="btn-zoom-out" title="Kleiner">−</button>
-        <button id="btn-zoom-reset" title="Passbreite (Strg+0)">100%</button>
-        <button id="btn-zoom-in" title="Größer">+</button>
-      </div>
-      <button id="btn-invert" title="Invertieren (Strg+I)">Invert</button>
-    </header>
+      <nav id="dock" class="glass">
+        <button id="b-home" class="ico" title="Bibliothek"></button>
+        <span class="div"></span>
+        <button id="t-none" class="ico on" title="Auswahl · V"></button>
+        <button id="t-mark" class="ico" title="Marker · M"></button>
+        <button id="t-ink" class="ico" title="Stift · Z"></button>
+        <button id="t-text" class="ico" title="Textfeld · T"></button>
+        <label id="swatch" title="Farbe"><input id="color" type="color" value="#ffd23f" /></label>
+        <span class="div"></span>
+        <button id="b-find" class="ico" title="Suchen · Strg+F"></button>
+        <button id="b-invert" class="ico" title="Invertieren · Strg+I"></button>
+        <button id="b-save" class="ico" title="Sichern · Strg+S" disabled></button>
+      </nav>
+    </section>
 
-    <div id="findbar" hidden>
-      <input id="find-q" type="text" placeholder="Im Dokument suchen" spellcheck="false" autocomplete="off" />
-      <span id="find-count"></span>
-      <button id="find-prev" title="Zurück (Shift+Enter)">↑</button>
-      <button id="find-next" title="Weiter (Enter)">↓</button>
-      <button id="find-close" title="Schließen (Esc)">✕</button>
-    </div>
-
-    <div id="container"><div id="viewer" class="pdfViewer"></div></div>
-    <div id="drop">PDF hierher ziehen</div>
+    <div id="toast" class="glass" hidden></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
