@@ -8,15 +8,21 @@ import {
 } from "pdfjs-dist/web/pdf_viewer.mjs";
 import "pdfjs-dist/web/pdf_viewer.css";
 import "./styles.css"; // muss nach pdf_viewer.css kommen
+import { GlassLayer } from "./glass";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 const EditorType = pdfjsLib.AnnotationEditorType;
 const EditorParams = pdfjsLib.AnnotationEditorParamsType;
+
+/** Anteil der Fensterbreite, den die Seite beim Oeffnen einnimmt.
+ *  Eine Zahl - hier drehen, wenn es zu schmal oder zu breit wirkt. */
+const OPEN_WIDTH = 0.3;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -31,27 +37,31 @@ const findCount = $<HTMLElement>("find-count");
 const colorInput = $<HTMLInputElement>("color");
 const btnSave = $<HTMLButtonElement>("b-save");
 const btnInvert = $<HTMLButtonElement>("b-invert");
+const ann = $<HTMLElement>("ann");
+const annMore = $<HTMLElement>("ann-more");
 const toast = $<HTMLElement>("toast");
 
 // ---------- Symbole ----------
-// Strichzeichnungen, 24er-Raster, erben die Farbe vom Knopf.
 
-const P = (d: string, extra = "") =>
+const P = (d: string) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-     stroke-linecap="round" stroke-linejoin="round" ${extra}>${d}</svg>`;
+     stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 
 const ICON: Record<string, string> = {
-  "b-home": P('<path d="M4 6h6v12H4z"/><path d="M14 6h6v12h-6z"/>'),
-  "t-none": P('<path d="M5 3l14 8-6 1.6L10 19z"/>'),
-  "t-mark": P('<path d="M4 20h5"/><path d="m9 16 8.5-8.5a2.1 2.1 0 0 0-3-3L6 13v3h3z"/>'),
-  "t-ink": P('<path d="M3 20c3-1 4-6 7-6s3 3 5 3 4-3 6-9"/>'),
-  "t-text": P('<path d="M5 6h14"/><path d="M12 6v13"/>'),
+  "b-home": P('<path d="M14.5 5 8 12l6.5 7"/>'),
   "b-find": P('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>'),
   "b-invert": P('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" stroke="none"/>'),
   "b-save": P('<path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 19h14"/>'),
+  "a-toggle": P('<path d="M4 20h5"/><path d="m9 16 8.5-8.5a2.1 2.1 0 0 0-3-3L6 13v3h3z"/>'),
+  "t-mark": P('<path d="M4 20h16"/><path d="M6.5 16 15 7.5a2 2 0 0 1 3 3L9.5 19H6.5z" fill="currentColor" fill-opacity=".2"/>'),
+  "t-ink": P('<path d="M3 20c3-1 4-6 7-6s3 3 5 3 4-3 6-9"/>'),
+  "t-text": P('<path d="M5 6h14"/><path d="M12 6v13"/>'),
   "find-prev": P('<path d="m7 14 5-5 5 5"/>'),
   "find-next": P('<path d="m7 10 5 5 5-5"/>'),
   "find-close": P('<path d="M6.5 6.5l11 11"/><path d="M17.5 6.5l-11 11"/>'),
+  "w-min": P('<path d="M6 12h12"/>'),
+  "w-max": P('<rect x="6.5" y="6.5" width="11" height="11" rx="2"/>'),
+  "w-close": P('<path d="M7 7l10 10"/><path d="M17 7L7 17"/>'),
 };
 
 for (const [id, svg] of Object.entries(ICON)) {
@@ -61,19 +71,18 @@ for (const [id, svg] of Object.entries(ICON)) {
 
 const PLUS = P('<path d="M12 5v14"/><path d="M5 12h14"/>');
 
+// ---------- Fensterknoepfe ----------
+
+const win = getCurrentWindow();
+$<HTMLButtonElement>("w-min").addEventListener("click", () => void win.minimize());
+$<HTMLButtonElement>("w-max").addEventListener("click", () => void win.toggleMaximize());
+$<HTMLButtonElement>("w-close").addEventListener("click", () => void win.close());
+
 // ---------- Zuletzt geoeffnet ----------
 
-type Recent = {
-  path: string;
-  name: string;
-  thumb: string;
-  page: number;
-  pages: number;
-  at: number;
-};
+type Recent = { path: string; name: string; thumb: string; page: number; pages: number; at: number };
 
 const KEY = "folio.recents";
-const MAX_RECENTS = 23;
 
 function loadRecents(): Recent[] {
   try {
@@ -86,12 +95,9 @@ function loadRecents(): Recent[] {
 
 function saveRecents(list: Recent[]) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(list.slice(0, MAX_RECENTS)));
+    localStorage.setItem(KEY, JSON.stringify(list.slice(0, 23)));
   } catch {
-    // Speicher voll: aeltestes Deckelbild opfern und erneut versuchen.
-    try {
-      localStorage.setItem(KEY, JSON.stringify(list.slice(0, 10)));
-    } catch { /* aufgeben, Liste ist nicht kritisch */ }
+    try { localStorage.setItem(KEY, JSON.stringify(list.slice(0, 10))); } catch { /* egal */ }
   }
 }
 
@@ -99,16 +105,14 @@ function touchRecent(patch: Partial<Recent> & { path: string }) {
   const list = loadRecents();
   const i = list.findIndex((r) => r.path === patch.path);
   const base: Recent =
-    i === -1
-      ? { path: patch.path, name: "", thumb: "", page: 1, pages: 1, at: 0 }
-      : list[i];
+    i === -1 ? { path: patch.path, name: "", thumb: "", page: 1, pages: 1, at: 0 } : list[i];
   const next = { ...base, ...patch, at: Date.now() };
   if (i !== -1) list.splice(i, 1);
   list.unshift(next);
   saveRecents(list);
 }
 
-// ---------- Startseite ----------
+// ---------- Bibliothek ----------
 
 function renderHome() {
   grid.replaceChildren();
@@ -120,8 +124,7 @@ function renderHome() {
   drop.addEventListener("click", () => void pick());
   grid.appendChild(drop);
 
-  const list = loadRecents();
-  list.forEach((r, i) => {
+  loadRecents().forEach((r, i) => {
     const t = document.createElement("button");
     t.className = "tile";
     t.title = r.path;
@@ -133,6 +136,7 @@ function renderHome() {
       const img = document.createElement("img");
       img.src = r.thumb;
       img.alt = "";
+      img.addEventListener("load", () => glass?.invalidate());
       cover.appendChild(img);
     }
     if (r.pages > 1 && r.page > 1) {
@@ -150,16 +154,62 @@ function renderHome() {
     t.addEventListener("click", () => void openPath(r.path));
     grid.appendChild(t);
   });
+  glass?.invalidate();
 }
 
-// ---------- PDF.js-Komponenten ----------
+// ---------- Glasschicht ----------
+
+/** Malt, was hinter dem Glas liegt. Im Leser sind das die Seiten-Canvas,
+ *  in der Bibliothek der Grund samt Deckelbildern. */
+function paintBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const k = w / Math.max(1, window.innerWidth);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.filter = "none";
+
+  if (!reader.hidden) {
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, w, h);
+    if (container.classList.contains("invert")) {
+      ctx.filter = "contrast(0.8) invert(1) hue-rotate(180deg)";
+    }
+    for (const cv of container.querySelectorAll("canvas")) {
+      const r = cv.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > window.innerHeight || r.width < 2) continue;
+      try { ctx.drawImage(cv, r.x * k, r.y * k, r.width * k, r.height * k); } catch { /* leer */ }
+    }
+    ctx.filter = "none";
+    return;
+  }
+
+  ctx.fillStyle = "#08080a";
+  ctx.fillRect(0, 0, w, h);
+  const g1 = ctx.createRadialGradient(w * 0.22, -h * 0.12, 0, w * 0.22, -h * 0.12, w * 0.75);
+  g1.addColorStop(0, "#1c1c22");
+  g1.addColorStop(1, "rgba(28,28,34,0)");
+  ctx.fillStyle = g1;
+  ctx.fillRect(0, 0, w, h);
+  for (const img of grid.querySelectorAll("img")) {
+    const r = img.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight) continue;
+    try { ctx.drawImage(img, r.x * k, r.y * k, r.width * k, r.height * k); } catch { /* leer */ }
+  }
+}
+
+let glass: GlassLayer | null = null;
+try {
+  glass = new GlassLayer($<HTMLCanvasElement>("glasslayer"));
+  glass.setPainter(paintBackdrop);
+} catch {
+  document.body.classList.add("no-gl");
+}
+
+// ---------- PDF.js ----------
 
 const eventBus = new EventBus();
 const linkService = new PDFLinkService({ eventBus });
 const findController = new PDFFindController({ eventBus, linkService });
 
-/** Wir liefern keine Sprachdateien aus. Der Stellvertreter antwortet auf
- *  jede Methode still, statt PDF.js beim ersten Aufruf krachen zu lassen. */
+/** Wir liefern keine Sprachdateien aus; der Stellvertreter antwortet still. */
 const l10n = new Proxy(
   {},
   {
@@ -192,12 +242,18 @@ let currentPath: string | null = null;
 let pendingPage = 1;
 let dirty = false;
 
+function fitOpen() {
+  if (!pdfViewer.pdfDocument) return;
+  pdfViewer.currentScaleValue = "page-width";
+  pdfViewer.currentScale *= OPEN_WIDTH;
+}
+
 let chipTimer = 0;
 function flashChip(text: string) {
   pagechip.textContent = text;
   pagechip.classList.add("show");
   window.clearTimeout(chipTimer);
-  chipTimer = window.setTimeout(() => pagechip.classList.remove("show"), 1500);
+  chipTimer = window.setTimeout(() => pagechip.classList.remove("show"), 1600);
 }
 
 let toastTimer = 0;
@@ -208,28 +264,22 @@ function say(msg: string) {
   toastTimer = window.setTimeout(() => (toast.hidden = true), 4000);
 }
 
-/** Passbreite mit schmalem schwarzem Rand ringsum. PDF.js kennt nur
- *  "ganze Breite", deshalb danach um genau den Rand herunterskalieren. */
-const FRAME = 14;
-function fitWidth() {
-  if (!pdfViewer.pdfDocument) return;
-  pdfViewer.currentScaleValue = "page-width";
-  const w = container.clientWidth;
-  if (w > FRAME * 2) pdfViewer.currentScale *= (w - FRAME * 2) / w;
+function markDirty(state: boolean) {
+  dirty = state;
+  btnSave.hidden = !state;
 }
 
-let resizeTimer = 0;
-window.addEventListener("resize", () => {
-  window.clearTimeout(resizeTimer);
-  resizeTimer = window.setTimeout(fitWidth, 160);
-});
-
 eventBus.on("pagesinit", () => {
-  fitWidth();
+  fitOpen();
   if (pendingPage > 1 && pendingPage <= pdfViewer.pagesCount) {
     pdfViewer.currentPageNumber = pendingPage;
+  } else {
+    // PDF.js scrollt beim Aufbau auf Seite 1 und frisst damit die Luecke
+    // oben. Wieder ganz nach oben, damit sie beim Oeffnen zu sehen ist.
+    requestAnimationFrame(() => { container.scrollTop = 0; glass?.invalidate(); });
   }
   flashChip(pdfViewer.currentPageNumber + " / " + pdfViewer.pagesCount);
+  glass?.invalidate();
 });
 
 eventBus.on("pagechanging", (e: { pageNumber: number }) => {
@@ -239,15 +289,17 @@ eventBus.on("pagechanging", (e: { pageNumber: number }) => {
   }
 });
 
-function markDirty(state: boolean) {
-  dirty = state;
-  btnSave.disabled = !state;
-}
+eventBus.on("pagerendered", () => glass?.invalidate());
+eventBus.on("scalechanging", () => glass?.invalidate());
+container.addEventListener("scroll", () => glass?.invalidate(), { passive: true });
+window.addEventListener("resize", () => {
+  window.clearTimeout(resizeTimer);
+  resizeTimer = window.setTimeout(() => { fitOpen(); glass?.invalidate(); }, 160);
+});
+let resizeTimer = 0;
 
 // ---------- Laden ----------
 
-/** Deckelbild aus der ersten Seite. Klein genug, dass zwanzig davon
- *  bequem in den lokalen Speicher passen. */
 async function makeThumb(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
   try {
     const page = await doc.getPage(1);
@@ -265,11 +317,6 @@ async function makeThumb(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
   } catch {
     return "";
   }
-}
-
-function showReader() {
-  home.hidden = true;
-  reader.hidden = false;
 }
 
 function showHome() {
@@ -299,7 +346,10 @@ async function openPath(path: string) {
     currentPath = path;
     markDirty(false);
     setTool("none");
-    showReader();
+    closeAnn();
+    home.hidden = true;
+    reader.hidden = false;
+    glass?.invalidate();
 
     const thumb = known?.thumb || (await makeThumb(doc));
     touchRecent({ path, name, thumb, pages: doc.numPages, page: pendingPage });
@@ -309,10 +359,7 @@ async function openPath(path: string) {
 }
 
 async function pick() {
-  const sel = await openDialog({
-    multiple: false,
-    filters: [{ name: "PDF", extensions: ["pdf"] }],
-  });
+  const sel = await openDialog({ multiple: false, filters: [{ name: "PDF", extensions: ["pdf"] }] });
   if (typeof sel === "string") await openPath(sel);
 }
 
@@ -327,19 +374,16 @@ async function save() {
   if (!currentPath || !pdfViewer.pdfDocument || !dirty) return;
   btnSave.disabled = true;
   try {
-    // saveDocument schreibt die Annotationen als echte PDF-Objekte zurueck.
     const bytes: Uint8Array = await pdfViewer.pdfDocument.saveDocument();
-    // Rohbytes im Koerper, Pfad hex-kodiert im Kopf: Kopfzeilen
-    // vertragen keine Umlaute.
     await invoke("save_pdf", bytes, { headers: { "x-path": hex(currentPath) } });
     pdfViewer.pdfDocument.annotationStorage.resetModified();
     markDirty(false);
-    // Deckelbild auffrischen, damit die Markierung auf der Kachel sichtbar wird.
     const thumb = await makeThumb(pdfViewer.pdfDocument);
     if (thumb) touchRecent({ path: currentPath, thumb });
   } catch (err) {
-    markDirty(true);
     say("Sichern fehlgeschlagen: " + String(err));
+  } finally {
+    btnSave.disabled = false;
   }
 }
 
@@ -353,7 +397,6 @@ const TOOL_MODE: Record<string, number> = {
 };
 
 const toolBtn: Record<string, HTMLButtonElement> = {
-  none: $<HTMLButtonElement>("t-none"),
   mark: $<HTMLButtonElement>("t-mark"),
   ink: $<HTMLButtonElement>("t-ink"),
   text: $<HTMLButtonElement>("t-text"),
@@ -371,13 +414,10 @@ function setTool(next: string) {
   if (!pdfViewer.pdfDocument) return;
   // "switchannotationeditormode" wird von PDF.js nur gesendet, nicht
   // empfangen - das Umschalten laeuft ueber diesen Setter.
-  try {
-    pdfViewer.annotationEditorMode = { mode: TOOL_MODE[next] };
-  } catch { /* Editor noch nicht bereit */ }
+  try { pdfViewer.annotationEditorMode = { mode: TOOL_MODE[next] }; } catch { /* noch nicht bereit */ }
   if (next !== "none") applyColor();
 }
 
-/** PDF.js schaltet den Modus manchmal selbst um, etwa nach Escape. */
 eventBus.on("switchannotationeditormode", (e: { mode: number }) => {
   const key = Object.keys(TOOL_MODE).find((k) => TOOL_MODE[k] === e.mode);
   if (key && key !== tool) { tool = key; paintTool(key); }
@@ -390,17 +430,32 @@ function applyColor() {
     : tool === "text" ? EditorParams.FREETEXT_COLOR
     : null;
   if (type === null) return;
-  eventBus.dispatch("switchannotationeditorparams", {
-    source: window,
-    type,
-    value: colorInput.value,
-  });
+  eventBus.dispatch("switchannotationeditorparams", { source: window, type, value: colorInput.value });
 }
 
+/** Die Palette faehrt aus dem einen Knopf heraus. Breite wird gemessen,
+ *  damit die Federbewegung stimmt, egal wie viele Werkzeuge drin sind. */
+function openAnn() {
+  ann.classList.add("open");
+  annMore.style.width = annMore.scrollWidth + "px";
+}
+
+function closeAnn() {
+  ann.classList.remove("open");
+  annMore.style.width = "0px";
+  if (tool !== "none") setTool("none");
+}
+
+$<HTMLButtonElement>("a-toggle").addEventListener("click", () => {
+  if (ann.classList.contains("open")) closeAnn();
+  else { openAnn(); setTool("mark"); }
+});
+
 for (const [key, btn] of Object.entries(toolBtn)) {
-  btn.addEventListener("click", () => setTool(key));
+  btn.addEventListener("click", () => setTool(tool === key ? "none" : key));
 }
 colorInput.addEventListener("input", applyColor);
+
 btnSave.addEventListener("click", () => void save());
 
 $<HTMLButtonElement>("b-home").addEventListener("click", () => {
@@ -411,6 +466,7 @@ $<HTMLButtonElement>("b-home").addEventListener("click", () => {
 btnInvert.addEventListener("click", () => {
   container.classList.toggle("invert");
   btnInvert.classList.toggle("on");
+  glass?.invalidate();
 });
 
 container.addEventListener(
@@ -419,7 +475,7 @@ container.addEventListener(
     if (!(e.ctrlKey || e.metaKey) || !pdfViewer.pdfDocument) return;
     e.preventDefault();
     const f = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-    pdfViewer.currentScale = Math.min(6, Math.max(0.25, pdfViewer.currentScale * f));
+    pdfViewer.currentScale = Math.min(6, Math.max(0.1, pdfViewer.currentScale * f));
     flashChip(Math.round(pdfViewer.currentScale * 100) + " %");
   },
   { passive: false }
@@ -486,16 +542,11 @@ $<HTMLButtonElement>("find-prev").addEventListener("click", () => dispatchFind(t
 
 window.addEventListener("keydown", (e) => {
   const typing =
-    e.target instanceof HTMLElement &&
-    (e.target.tagName === "INPUT" || e.target.isContentEditable);
+    e.target instanceof HTMLElement && (e.target.tagName === "INPUT" || e.target.isContentEditable);
   const ctrl = e.ctrlKey || e.metaKey;
   const k = e.key.toLowerCase();
 
-  if (e.key === "F11") {
-    e.preventDefault();
-    document.body.classList.toggle("bare");
-    return;
-  }
+  if (e.key === "F11") { e.preventDefault(); document.body.classList.toggle("bare"); return; }
   if (reader.hidden) {
     if (ctrl && k === "o") { e.preventDefault(); void pick(); }
     return;
@@ -505,23 +556,21 @@ window.addEventListener("keydown", (e) => {
   else if (ctrl && k === "f") { e.preventDefault(); openFind(); }
   else if (ctrl && k === "s") { e.preventDefault(); void save(); }
   else if (ctrl && k === "i") { e.preventDefault(); btnInvert.click(); }
-  else if (ctrl && e.key === "0") { e.preventDefault(); fitWidth(); }
+  else if (ctrl && e.key === "0") { e.preventDefault(); fitOpen(); }
   else if (e.key === "F3") { e.preventDefault(); dispatchFind(true, e.shiftKey); }
   else if (e.key === "Escape") {
     if (!findbar.hidden) { e.preventDefault(); closeFind(); }
-    else if (!document.body.classList.contains("bare")) { e.preventDefault(); setTool("none"); }
+    else if (ann.classList.contains("open")) { e.preventDefault(); closeAnn(); }
   }
   else if (!ctrl && !typing) {
-    if (k === "v") setTool("none");
-    else if (k === "m") setTool("mark");
-    else if (k === "z") setTool("ink");
-    else if (k === "t") setTool("text");
+    if (k === "m") { openAnn(); setTool("mark"); }
+    else if (k === "z") { openAnn(); setTool("ink"); }
+    else if (k === "t") { openAnn(); setTool("text"); }
+    else if (k === "v") setTool("none");
   }
 });
 
-window.addEventListener("beforeunload", (e) => {
-  if (dirty) e.preventDefault();
-});
+window.addEventListener("beforeunload", (e) => { if (dirty) e.preventDefault(); });
 
 // ---------- Dateien von aussen ----------
 
@@ -535,14 +584,10 @@ void getCurrentWebview().onDragDropEvent((e) => {
   }
 });
 
-void listen<string>("folio://open", (e) => {
-  if (e.payload) void openPath(e.payload);
-});
+void listen<string>("folio://open", (e) => { if (e.payload) void openPath(e.payload); });
 
 // ---------- Start ----------
 
 renderHome();
 
-void invoke<string | null>("startup_file").then((p) => {
-  if (p) void openPath(p);
-});
+void invoke<string | null>("startup_file").then((p) => { if (p) void openPath(p); });

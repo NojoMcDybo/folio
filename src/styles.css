@@ -4,6 +4,7 @@
   --accent: #9b8cff;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --bar-h: 34px;
   color-scheme: dark;
 }
 
@@ -23,65 +24,200 @@ html, body {
 button { font: inherit; color: inherit; cursor: pointer; }
 [hidden] { display: none !important; }
 
+/* Die Glasflaechen malt WebGL auf diese Ebene: ueber dem Inhalt,
+   unter den Symbolen, ohne Klicks anzunehmen. */
+#glasslayer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+/* Rahmenloses Fenster: dieser Streifen zieht es. */
+#titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--bar-h);
+  z-index: 34;
+}
+
 /* ---------- Glas ----------
-   Zwei Schichten: der ::before traegt die gebrochene, gesaettigte
-   Hintergrundkopie, der ::after den Lichtsaum an der Oberkante.
-   Der Inhalt liegt darueber und bleibt scharf. */
+   Ohne Hintergrund: den zeichnet der Shader. Nur die Form und der
+   Schlagschatten kommen aus CSS. */
 
 .glass {
+  position: fixed;
+  z-index: 40;
+  border-radius: 19px;
+  background: transparent;
+  filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.55));
+  transition: opacity 0.34s var(--ease), translate 0.44s var(--spring);
+}
+
+/* Notnagel, falls WebGL nicht startet. */
+body.no-gl .glass {
+  background: rgba(16, 16, 20, 0.55);
+  backdrop-filter: blur(24px) saturate(190%) brightness(0.75);
+  -webkit-backdrop-filter: blur(24px) saturate(190%) brightness(0.75);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.glass.row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px;
+}
+
+.glass.solo { padding: 0; border-radius: 50%; }
+
+/* ---------- Symbole ---------- */
+
+.ico {
   position: relative;
-  isolation: isolate;
-  border-radius: 22px;
-  background: rgba(16, 16, 20, 0.5);
-  box-shadow:
-    0 20px 55px rgba(0, 0, 0, 0.6),
-    0 2px 10px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.11);
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.86);
+  transition: color 0.2s var(--ease), background 0.2s var(--ease), transform 0.38s var(--spring);
 }
 
-.glass::before {
+.ico.sm { width: 30px; height: 30px; }
+.ico svg { width: 18px; height: 18px; pointer-events: none; }
+.ico.sm svg { width: 14px; height: 14px; }
+
+.ico:hover { color: #fff; background: rgba(255, 255, 255, 0.14); }
+.ico:active { transform: scale(0.86); transition-duration: 0.08s; }
+.ico:disabled { opacity: 0.3; pointer-events: none; }
+.ico.danger:hover { background: #d13b3b; color: #fff; }
+
+.ico.on { color: #fff; background: rgba(155, 140, 255, 0.34); }
+.ico.on::after {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: -4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(155, 140, 255, 0.45), transparent 70%);
   z-index: -1;
-  border-radius: inherit;
-  /* brightness unter 1: der helle Papiergrund wird abgedunkelt, damit
-     die weissen Symbole darauf stehen koennen. Ueber dunklem Inhalt
-     bleibt es fast unsichtbar - genau wie getoentes Glas. */
-  backdrop-filter: blur(26px) saturate(190%) brightness(0.72);
-  -webkit-backdrop-filter: blur(26px) saturate(190%) brightness(0.72);
+  animation: glow 0.4s var(--ease);
 }
 
-/* Kantenbrechung: der Rand verzerrt staerker als die Mitte, wie bei
-   einer echten Linse. Umgesetzt als schmaler Ring mit Verzerrungsfilter. */
-.glass::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  backdrop-filter: blur(3px) url(#glass);
-  -webkit-backdrop-filter: blur(3px);
-  mask:
-    linear-gradient(#000 0 0) content-box exclude,
-    linear-gradient(#000 0 0);
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box exclude,
-    linear-gradient(#000 0 0);
-  padding: 10px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+@keyframes glow { from { opacity: 0; transform: scale(0.5); } }
+
+/* .ico setzt position:relative und wuerde das fixed der Glasklasse
+   ueberschreiben - hier ausdruecklich zurueckholen. */
+#b-home, #b-find, #b-invert, #b-save,
+#wincontrols, #pagechip, #ann, #findbar, #toast { position: fixed; }
+
+/* Einzelne Knoepfe an den Stellen, an denen man sie erwartet. */
+#b-home { top: 12px; left: 14px; }
+#b-find { top: 12px; right: 178px; }
+#b-invert { top: 12px; right: 128px; }
+#wincontrols { top: 12px; right: 14px; border-radius: 17px; }
+#pagechip {
+  bottom: 22px;
+  left: 22px;
+  padding: 8px 14px;
+  border-radius: 15px;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.8);
+  opacity: 0;
+}
+#pagechip.show { opacity: 1; }
+#b-save { bottom: 22px; right: 22px; }
+#ann { bottom: 22px; left: 50%; translate: -50% 0; }
+#findbar { top: 12px; left: 50%; translate: -50% 0; padding: 5px 5px 5px 14px; }
+
+/* Annotationen: ein Knopf, der sich zur Palette oeffnet. */
+#ann-more {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: width 0.4s var(--spring), opacity 0.22s var(--ease);
 }
 
-/* ---------- Startseite ---------- */
+#ann.open #ann-more { opacity: 1; }
+#ann.open #a-toggle { color: #fff; background: rgba(255, 255, 255, 0.14); }
+
+#swatch {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: 0 0 38px;
+  transition: transform 0.38s var(--spring);
+}
+#swatch:hover { transform: scale(1.1); }
+#swatch:active { transform: scale(0.86); }
+
+#color {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.45), 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+#color::-webkit-color-swatch-wrapper { padding: 0; }
+#color::-webkit-color-swatch { border: 0; border-radius: 50%; }
+
+/* F11 raeumt alles Schwebende weg. */
+body.bare .glass { opacity: 0; pointer-events: none; }
+body.bare #titlebar { pointer-events: none; }
+
+/* ---------- Suche ---------- */
+
+#find-q {
+  width: 220px;
+  height: 28px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  outline: none;
+  user-select: text;
+}
+
+#find-count {
+  min-width: 58px;
+  text-align: right;
+  padding-right: 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+#toast {
+  bottom: 90px;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 60;
+  max-width: 460px;
+  padding: 11px 17px;
+  border-radius: 15px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* ---------- Bibliothek ---------- */
 
 #home {
   height: 100%;
   overflow-y: auto;
-  padding: 56px 48px 80px;
+  padding: 64px 48px 80px;
   background:
     radial-gradient(1100px 700px at 22% -12%, #1c1c22 0%, transparent 62%),
     radial-gradient(900px 600px at 88% 8%, #17171d 0%, transparent 58%),
@@ -98,8 +234,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
   margin: 0 auto;
 }
 
-/* Kachel: Deckel + schmale Zeile darunter. Kein Text ausser dem
-   Dateinamen - der ist Inhalt, keine Dekoration. */
 .tile {
   border: 0;
   padding: 0;
@@ -111,9 +245,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   animation: rise 0.5s var(--ease) backwards;
 }
 
-@keyframes rise {
-  from { opacity: 0; transform: translateY(14px); }
-}
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } }
 
 .cover {
   position: relative;
@@ -121,26 +253,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border-radius: 5px;
   overflow: hidden;
   background: #16161a;
-  box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.6),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.07);
-  transition:
-    transform 0.42s var(--spring),
-    box-shadow 0.42s var(--ease);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  transition: transform 0.42s var(--spring), box-shadow 0.42s var(--ease);
 }
 
 .cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .tile:hover .cover {
   transform: translateY(-7px) scale(1.022);
-  box-shadow:
-    0 22px 44px rgba(0, 0, 0, 0.7),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  box-shadow: 0 22px 44px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.14);
 }
 
 .tile:active .cover { transform: translateY(-2px) scale(0.985); transition-duration: 0.12s; }
 
-/* Lesefortschritt als haarfeiner Balken am unteren Deckelrand. */
 .bar {
   position: absolute;
   left: 0;
@@ -163,7 +288,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .tile:hover .name { color: var(--ink); }
 
-/* Erste Kachel: Ablegeflaeche und Dateiauswahl in einem. */
 .drop .cover {
   display: grid;
   place-items: center;
@@ -178,205 +302,31 @@ button { font: inherit; color: inherit; cursor: pointer; }
   transition: stroke 0.3s var(--ease), transform 0.42s var(--spring);
 }
 
-.drop:hover .cover {
-  background: rgba(255, 255, 255, 0.055);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-}
-
+.drop:hover .cover { background: rgba(255, 255, 255, 0.055); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2); }
 .drop:hover .cover svg { stroke: var(--ink); transform: rotate(90deg) scale(1.12); }
 
-body.dragging .drop .cover {
-  background: rgba(155, 140, 255, 0.14);
-  box-shadow: inset 0 0 0 2px var(--accent);
-}
-
+body.dragging .drop .cover { background: rgba(155, 140, 255, 0.14); box-shadow: inset 0 0 0 2px var(--accent); }
 body.dragging .drop .cover svg { stroke: var(--accent); transform: scale(1.25); }
 
 /* ---------- Leser ---------- */
 
 #reader { position: absolute; inset: 0; background: #000; }
-
-#container {
-  position: absolute;
-  inset: 0;
-  overflow: auto;
-  background: #000;
-  scrollbar-width: none;
-}
-
+#container { position: absolute; inset: 0; overflow: auto; background: #000; scrollbar-width: none; }
 #container::-webkit-scrollbar { width: 0; height: 0; }
 
-/* Vollbild mit schmalem schwarzem Rahmen ringsum. */
-#viewer { --page-margin: 10px; padding: 10px 0; }
+/* Grosse Luecke oben beim Oeffnen - scrollt einfach weg. */
+#viewer { --page-margin: 12px; padding: 26vh 0 14px; }
 
 .pdfViewer .page {
   border: none;
   margin: 0 auto var(--page-margin);
   background: #0a0a0a;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 50px rgba(0, 0, 0, 0.8);
 }
 
-/* Farb-Invertierung: nur das Seitenbild drehen, nicht die Annotationen. */
 #container.invert .pdfViewer .page { background: #101010; }
 #container.invert .pdfViewer .canvasWrapper canvas {
   filter: contrast(0.8) invert(1) hue-rotate(180deg);
-}
-
-/* ---------- Schwebende Bedienung ---------- */
-
-#dock {
-  position: absolute;
-  bottom: 26px;
-  left: 50%;
-  translate: -50% 0;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 7px;
-  z-index: 40;
-  transition: opacity 0.34s var(--ease), translate 0.44s var(--spring);
-}
-
-#pagechip {
-  position: absolute;
-  top: 22px;
-  right: 24px;
-  z-index: 40;
-  padding: 7px 13px;
-  border-radius: 13px;
-  font-size: 11.5px;
-  font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.72);
-  opacity: 0;
-  transition: opacity 0.5s var(--ease), translate 0.44s var(--spring);
-}
-
-#pagechip.show { opacity: 1; }
-
-/* F11 blendet alles Schwebende aus. */
-body.bare #dock { opacity: 0; translate: -50% 130%; pointer-events: none; }
-body.bare #pagechip,
-body.bare #findbar { opacity: 0; pointer-events: none; }
-
-/* ---------- Symbolknoepfe ---------- */
-
-.ico {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  border: 0;
-  border-radius: 16px;
-  background: transparent;
-  display: grid;
-  place-items: center;
-  color: rgba(255, 255, 255, 0.8);
-  transition:
-    color 0.22s var(--ease),
-    background 0.22s var(--ease),
-    transform 0.4s var(--spring);
-}
-
-.ico svg { width: 19px; height: 19px; pointer-events: none; }
-
-.ico:hover { color: #fff; background: rgba(255, 255, 255, 0.11); transform: translateY(-2px); }
-.ico:active { transform: translateY(0) scale(0.9); transition-duration: 0.09s; }
-.ico:disabled { opacity: 0.28; pointer-events: none; }
-
-.ico.on { color: #fff; background: rgba(155, 140, 255, 0.3); }
-
-/* Weicher Schein unter dem aktiven Werkzeug. */
-.ico.on::after {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border-radius: 18px;
-  background: radial-gradient(circle, rgba(155, 140, 255, 0.4), transparent 68%);
-  z-index: -1;
-  animation: glow 0.45s var(--ease);
-}
-
-@keyframes glow { from { opacity: 0; transform: scale(0.6); } }
-
-.div { width: 1px; height: 22px; background: rgba(255, 255, 255, 0.13); margin: 0 5px; }
-
-#swatch {
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: transform 0.4s var(--spring);
-}
-
-#swatch:hover { transform: translateY(-2px) scale(1.06); }
-#swatch:active { transform: scale(0.9); }
-
-#color {
-  width: 19px;
-  height: 19px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  cursor: pointer;
-  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.35), 0 2px 7px rgba(0, 0, 0, 0.55);
-}
-
-#color::-webkit-color-swatch-wrapper { padding: 0; }
-#color::-webkit-color-swatch { border: 0; border-radius: 50%; }
-
-/* ---------- Suche ---------- */
-
-#findbar {
-  position: absolute;
-  top: 22px;
-  left: 50%;
-  translate: -50% 0;
-  z-index: 45;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 7px 7px 7px 15px;
-  border-radius: 19px;
-  animation: dropin 0.4s var(--spring);
-}
-
-@keyframes dropin { from { opacity: 0; translate: -50% -16px; } }
-
-#find-q {
-  width: 230px;
-  height: 28px;
-  border: 0;
-  background: none;
-  color: var(--ink);
-  font: inherit;
-  outline: none;
-  user-select: text;
-}
-
-#find-count {
-  min-width: 62px;
-  text-align: right;
-  padding-right: 5px;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.42);
-}
-
-/* ---------- Hinweis ---------- */
-
-#toast {
-  position: absolute;
-  bottom: 92px;
-  left: 50%;
-  translate: -50% 0;
-  z-index: 60;
-  max-width: 480px;
-  padding: 11px 17px;
-  border-radius: 15px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
-  animation: dropin 0.4s var(--spring);
 }
 
 /* ---------- PDF.js an unser Aussehen anpassen ---------- */
@@ -390,7 +340,7 @@ body.bare #findbar { opacity: 0; pointer-events: none; }
 .textLayer .highlight.selected { background: rgba(155, 140, 255, 0.7); }
 
 #container .editToolbar {
-  --editor-toolbar-bg-color: rgba(26, 26, 30, 0.86);
+  --editor-toolbar-bg-color: rgba(26, 26, 30, 0.9);
   --editor-toolbar-fg-color: #f2f2f4;
   --editor-toolbar-border-color: rgba(255, 255, 255, 0.16);
   --editor-toolbar-hover-border-color: rgba(255, 255, 255, 0.28);

@@ -6,48 +6,50 @@
     <title>Folio</title>
   </head>
   <body>
-    <!-- Brechungsfilter fuer die Glasflaechen. Verzerrt den Hintergrund an
-         den Raendern, damit es nach Glas aussieht und nicht nach Milchscheibe. -->
-    <svg width="0" height="0" aria-hidden="true">
-      <filter id="glass" x="-20%" y="-20%" width="140%" height="140%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.008 0.012" numOctaves="2" seed="7" result="noise" />
-        <feGaussianBlur in="noise" stdDeviation="3" result="soft" />
-        <feDisplacementMap in="SourceGraphic" in2="soft" scale="14" xChannelSelector="R" yChannelSelector="G" />
-      </filter>
-    </svg>
+    <!-- Zeichenflaeche fuer das Glas. Liegt ueber dem Inhalt, unter den
+         Knoepfen, und nimmt keine Klicks an. -->
+    <canvas id="glasslayer"></canvas>
 
-    <!-- ---------- Startseite ---------- -->
-    <main id="home">
-      <div id="grid"></div>
-    </main>
+    <!-- Ziehbereich fuer das rahmenlose Fenster. -->
+    <div id="titlebar" data-tauri-drag-region></div>
 
-    <!-- ---------- Leser ---------- -->
+    <div id="wincontrols" class="glass row">
+      <button id="w-min" class="ico sm" title="Minimieren"></button>
+      <button id="w-max" class="ico sm" title="Maximieren"></button>
+      <button id="w-close" class="ico sm danger" title="Schließen"></button>
+    </div>
+
+    <main id="home"><div id="grid"></div></main>
+
     <section id="reader" hidden>
       <div id="container"><div id="viewer" class="pdfViewer"></div></div>
 
-      <div id="pagechip" class="glass chip"></div>
+      <button id="b-home" class="ico glass solo" title="Bibliothek"></button>
 
-      <div id="findbar" class="glass" hidden>
-        <input id="find-q" type="text" spellcheck="false" autocomplete="off" />
-        <span id="find-count"></span>
-        <button id="find-prev" class="ico" title="Zurück"></button>
-        <button id="find-next" class="ico" title="Weiter"></button>
-        <button id="find-close" class="ico" title="Schließen"></button>
+      <button id="b-find" class="ico glass solo" title="Suchen · Strg+F"></button>
+      <button id="b-invert" class="ico glass solo" title="Invertieren · Strg+I"></button>
+
+      <div id="pagechip" class="glass"></div>
+
+      <button id="b-save" class="ico glass solo" title="Sichern · Strg+S" hidden></button>
+
+      <div id="ann" class="glass row">
+        <button id="a-toggle" class="ico" title="Markieren und Zeichnen"></button>
+        <span id="ann-more">
+          <button id="t-mark" class="ico" title="Marker · M"></button>
+          <button id="t-ink" class="ico" title="Stift · Z"></button>
+          <button id="t-text" class="ico" title="Textfeld · T"></button>
+          <label id="swatch" title="Farbe"><input id="color" type="color" value="#ffd23f" /></label>
+        </span>
       </div>
 
-      <nav id="dock" class="glass">
-        <button id="b-home" class="ico" title="Bibliothek"></button>
-        <span class="div"></span>
-        <button id="t-none" class="ico on" title="Auswahl · V"></button>
-        <button id="t-mark" class="ico" title="Marker · M"></button>
-        <button id="t-ink" class="ico" title="Stift · Z"></button>
-        <button id="t-text" class="ico" title="Textfeld · T"></button>
-        <label id="swatch" title="Farbe"><input id="color" type="color" value="#ffd23f" /></label>
-        <span class="div"></span>
-        <button id="b-find" class="ico" title="Suchen · Strg+F"></button>
-        <button id="b-invert" class="ico" title="Invertieren · Strg+I"></button>
-        <button id="b-save" class="ico" title="Sichern · Strg+S" disabled></button>
-      </nav>
+      <div id="findbar" class="glass row" hidden>
+        <input id="find-q" type="text" spellcheck="false" autocomplete="off" />
+        <span id="find-count"></span>
+        <button id="find-prev" class="ico sm" title="Zurück"></button>
+        <button id="find-next" class="ico sm" title="Weiter"></button>
+        <button id="find-close" class="ico sm" title="Schließen"></button>
+      </div>
     </section>
 
     <div id="toast" class="glass" hidden></div>
