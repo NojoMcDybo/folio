@@ -1,0 +1,12 @@
+# Abhaengigkeiten
+node_modules/
+
+# Build-Ergebnisse
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# Editor / System
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Folio</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <header id="bar">
+      <button id="btn-open" title="Öffnen (Strg+O)">Öffnen</button>
+      <button id="btn-find" title="Suchen (Strg+F)">Suchen</button>
+      <span id="file"></span>
+      <span class="grow"></span>
+      <span id="pages"></span>
+      <div class="group">
+        <button id="btn-zoom-out" title="Kleiner (Strg+−)">−</button>
+        <button id="btn-zoom-reset" title="Passbreite (Strg+0)">100%</button>
+        <button id="btn-zoom-in" title="Größer (Strg++)">+</button>
+      </div>
+      <button id="btn-invert" title="Invertieren (Strg+I)">Invert</button>
+    </header>
+
+    <div id="findbar" hidden>
+      <input id="find-q" type="text" placeholder="Im Dokument suchen" spellcheck="false" autocomplete="off" />
+      <span id="find-count"></span>
+      <button id="find-prev" title="Zurück (Shift+Enter)">↑</button>
+      <button id="find-next" title="Weiter (Enter)">↓</button>
+      <button id="find-close" title="Schließen (Esc)">✕</button>
+    </div>
+
+    <main id="viewer">
+      <div id="drop">PDF hierher ziehen</div>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
