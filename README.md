@@ -4,12 +4,15 @@ PDF-Reader für Windows. Tauri v2 (Rust + WebView2), Frontend in TypeScript mit 
 
 ## Stand
 
+- Bibliothek als eigenes Fenster, zuletzt geöffnete Dokumente als Kacheln
+- Jedes Dokument in einem eigenen Fenster, dieselbe Datei kommt nach vorn
 - PDF öffnen: Dialog, Drag & Drop, Kommandozeilenargument, Dateizuordnung `.pdf`
+- Rahmenloses Fenster, Bedienung schwebt in Glas darüber, F11 blendet sie aus
+- Glas auf WebGL: Brechung des Seiteninhalts, kein Kunstlicht
+- Suche, Invertierung und Werkzeuge lassen sich frei hinschieben
+- Textmarker, Stift und Textfeld, Änderungen werden ins PDF zurückgeschrieben
 - Fortlaufendes Scrollen, Seiten werden nur im Sichtbereich gerendert
 - Zoom mit Strg+Rad, Ankerpunkt bleibt beim Zoomen erhalten
-- Farb-Invertierung für dunkles Lesen (Strg+I)
-- Textebene: markieren und kopieren
-- Volltextsuche (Strg+F)
 - Single-Instance: ein Prozess für alle geöffneten Dateien
 
 ## Tastatur
@@ -18,10 +21,14 @@ PDF-Reader für Windows. Tauri v2 (Rust + WebView2), Frontend in TypeScript mit 
 |---|---|
 | Strg+O | Öffnen |
 | Strg+F | Suchen |
+| Strg+S | Sichern |
 | Strg+I | Invertieren |
 | Strg + Rad | Zoom |
-| Strg+0 | Passbreite |
+| Strg+0 | Ausgangsbreite |
 | F3 | nächster Treffer |
+| F11 | Bedienung aus |
+| M / Z / T | Marker, Stift, Textfeld |
+| V | Werkzeug weg |
 
 ## Entwickeln
 
