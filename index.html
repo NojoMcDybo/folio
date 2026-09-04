@@ -6,11 +6,7 @@
     <title>Folio</title>
   </head>
   <body>
-    <!-- Zeichenflaeche fuer das Glas. Liegt ueber dem Inhalt, unter den
-         Knoepfen, und nimmt keine Klicks an. -->
     <canvas id="glasslayer"></canvas>
-
-    <!-- Ziehbereich fuer das rahmenlose Fenster. -->
     <div id="titlebar" data-tauri-drag-region></div>
 
     <div id="wincontrols" class="glass row">
@@ -25,22 +21,20 @@
       <div id="container"><div id="viewer" class="pdfViewer"></div></div>
 
       <button id="b-home" class="ico glass solo" title="Bibliothek"></button>
-
-      <button id="b-find" class="ico glass solo" title="Suchen · Strg+F"></button>
-      <button id="b-invert" class="ico glass solo" title="Invertieren · Strg+I"></button>
+      <button id="b-find" class="ico glass solo drag" title="Suchen · Strg+F"></button>
+      <button id="b-invert" class="ico glass solo drag" title="Invertieren · Strg+I"></button>
 
       <div id="pagechip" class="glass"></div>
-
       <button id="b-save" class="ico glass solo" title="Sichern · Strg+S" hidden></button>
 
-      <div id="ann" class="glass row">
-        <button id="a-toggle" class="ico" title="Markieren und Zeichnen"></button>
-        <span id="ann-more">
-          <button id="t-mark" class="ico" title="Marker · M"></button>
-          <button id="t-ink" class="ico" title="Stift · Z"></button>
-          <button id="t-text" class="ico" title="Textfeld · T"></button>
-          <label id="swatch" title="Farbe"><input id="color" type="color" value="#ffd23f" /></label>
-        </span>
+      <!-- Werkzeuge stehen einzeln, links und rechts vom Hauptknopf.
+           Der bleibt dadurch beim Aufklappen an derselben Stelle. -->
+      <div id="anngroup" class="drag">
+        <button id="t-mark" class="ico glass solo side" title="Textmarker · M"></button>
+        <button id="t-ink" class="ico glass solo side" title="Stift · Z"></button>
+        <button id="a-toggle" class="ico glass solo" title="Markieren und Zeichnen"></button>
+        <button id="t-text" class="ico glass solo side" title="Textfeld · T"></button>
+        <label id="swatch" class="glass solo side" title="Farbe"><input id="color" type="color" value="#ffd23f" /></label>
       </div>
 
       <div id="findbar" class="glass row" hidden>
@@ -48,9 +42,19 @@
         <span id="find-count"></span>
         <button id="find-prev" class="ico sm" title="Zurück"></button>
         <button id="find-next" class="ico sm" title="Weiter"></button>
-        <button id="find-close" class="ico sm" title="Schließen"></button>
       </div>
     </section>
+
+    <div id="ask" hidden>
+      <div id="askbox" class="glass">
+        <p id="asktext">Änderungen sichern?</p>
+        <div class="askrow">
+          <button id="ask-save">Sichern</button>
+          <button id="ask-drop">Verwerfen</button>
+          <button id="ask-cancel">Abbrechen</button>
+        </div>
+      </div>
+    </div>
 
     <div id="toast" class="glass" hidden></div>
 

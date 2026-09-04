@@ -37,9 +37,10 @@ const findCount = $<HTMLElement>("find-count");
 const colorInput = $<HTMLInputElement>("color");
 const btnSave = $<HTMLButtonElement>("b-save");
 const btnInvert = $<HTMLButtonElement>("b-invert");
-const ann = $<HTMLElement>("ann");
-const annMore = $<HTMLElement>("ann-more");
+const anngroup = $<HTMLElement>("anngroup");
+const btnTool = $<HTMLButtonElement>("a-toggle");
 const toast = $<HTMLElement>("toast");
+const ask = $<HTMLElement>("ask");
 
 // ---------- Symbole ----------
 
@@ -52,9 +53,9 @@ const ICON: Record<string, string> = {
   "b-find": P('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>'),
   "b-invert": P('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" stroke="none"/>'),
   "b-save": P('<path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 19h14"/>'),
-  "a-toggle": P('<path d="M4 20h5"/><path d="m9 16 8.5-8.5a2.1 2.1 0 0 0-3-3L6 13v3h3z"/>'),
-  "t-mark": P('<path d="M4 20h16"/><path d="M6.5 16 15 7.5a2 2 0 0 1 3 3L9.5 19H6.5z" fill="currentColor" fill-opacity=".2"/>'),
-  "t-ink": P('<path d="M3 20c3-1 4-6 7-6s3 3 5 3 4-3 6-9"/>'),
+  // Marker: breite Keilspitze mit Farbspur. Stift: schmale Feder.
+  "t-mark": P('<path d="M4.5 20.5h15"/><path d="M8 17.5h3.5l7-7.2a2.4 2.4 0 0 0-3.4-3.4l-7.1 7.1z" fill="currentColor" fill-opacity=".35"/><path d="M8 17.5v-3.5"/>'),
+  "t-ink": P('<path d="m5 19 1-3.6 9.3-9.3a1.9 1.9 0 0 1 2.7 2.7L8.6 18z"/><path d="m14.2 7.6 2.2 2.2"/><path d="M5 19h-.5"/>'),
   "t-text": P('<path d="M5 6h14"/><path d="M12 6v13"/>'),
   "find-prev": P('<path d="m7 14 5-5 5 5"/>'),
   "find-next": P('<path d="m7 10 5 5 5-5"/>'),
@@ -188,11 +189,8 @@ function paintBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
   g1.addColorStop(1, "rgba(28,28,34,0)");
   ctx.fillStyle = g1;
   ctx.fillRect(0, 0, w, h);
-  for (const img of grid.querySelectorAll("img")) {
-    const r = img.getBoundingClientRect();
-    if (r.bottom < 0 || r.top > window.innerHeight) continue;
-    try { ctx.drawImage(img, r.x * k, r.y * k, r.width * k, r.height * k); } catch { /* leer */ }
-  }
+  // Bewusst ohne die Deckelbilder: im Glas soll sich nur Dokumentinhalt
+  // spiegeln, nicht die Bibliothek.
 }
 
 let glass: GlassLayer | null = null;
@@ -349,6 +347,7 @@ async function openPath(path: string) {
     closeAnn();
     home.hidden = true;
     reader.hidden = false;
+    refreshDrag();
     glass?.invalidate();
 
     const thumb = known?.thumb || (await makeThumb(doc));
@@ -402,14 +401,26 @@ const toolBtn: Record<string, HTMLButtonElement> = {
   text: $<HTMLButtonElement>("t-text"),
 };
 
+/** Werkzeug, das zuletzt gewaehlt war - der Hauptknopf zeigt es an und
+ *  schaltet es an und aus, ohne dass die Maus wandern muss. */
+let armed = "mark";
 let tool = "none";
+
+const TOOL_ICON: Record<string, string> = {
+  mark: ICON["t-mark"],
+  ink: ICON["t-ink"],
+  text: ICON["t-text"],
+};
 
 function paintTool(key: string) {
   for (const [k, b] of Object.entries(toolBtn)) b.classList.toggle("on", k === key);
+  btnTool.classList.toggle("on", key !== "none");
+  btnTool.innerHTML = TOOL_ICON[key === "none" ? armed : key];
 }
 
 function setTool(next: string) {
   tool = next;
+  if (next !== "none") armed = next;
   paintTool(next);
   if (!pdfViewer.pdfDocument) return;
   // "switchannotationeditormode" wird von PDF.js nur gesendet, nicht
@@ -433,22 +444,18 @@ function applyColor() {
   eventBus.dispatch("switchannotationeditorparams", { source: window, type, value: colorInput.value });
 }
 
-/** Die Palette faehrt aus dem einen Knopf heraus. Breite wird gemessen,
- *  damit die Federbewegung stimmt, egal wie viele Werkzeuge drin sind. */
-function openAnn() {
-  ann.classList.add("open");
-  annMore.style.width = annMore.scrollWidth + "px";
-}
+function openAnn() { anngroup.classList.add("open"); }
 
 function closeAnn() {
-  ann.classList.remove("open");
-  annMore.style.width = "0px";
+  anngroup.classList.remove("open");
   if (tool !== "none") setTool("none");
 }
 
-$<HTMLButtonElement>("a-toggle").addEventListener("click", () => {
-  if (ann.classList.contains("open")) closeAnn();
-  else { openAnn(); setTool("mark"); }
+/** Hauptknopf: erster Klick oeffnet und schaltet das zuletzt benutzte
+ *  Werkzeug scharf, zweiter Klick an derselben Stelle schaltet es aus. */
+btnTool.addEventListener("click", () => {
+  if (tool !== "none") closeAnn();
+  else { openAnn(); setTool(armed); }
 });
 
 for (const [key, btn] of Object.entries(toolBtn)) {
@@ -458,14 +465,39 @@ colorInput.addEventListener("input", applyColor);
 
 btnSave.addEventListener("click", () => void save());
 
-$<HTMLButtonElement>("b-home").addEventListener("click", () => {
-  if (dirty) { say("Ungesicherte Markierungen — Strg+S"); return; }
+/** Rueckfrage vor dem Verlassen. Liefert true, wenn weitergegangen
+ *  werden darf. */
+function askSave(): Promise<boolean> {
+  return new Promise((resolve) => {
+    ask.hidden = false;
+    const done = (v: boolean) => {
+      ask.hidden = true;
+      $<HTMLButtonElement>("ask-save").onclick = null;
+      $<HTMLButtonElement>("ask-drop").onclick = null;
+      $<HTMLButtonElement>("ask-cancel").onclick = null;
+      resolve(v);
+    };
+    $<HTMLButtonElement>("ask-save").onclick = () => void save().then(() => done(true));
+    $<HTMLButtonElement>("ask-drop").onclick = () => { markDirty(false); done(true); };
+    $<HTMLButtonElement>("ask-cancel").onclick = () => done(false);
+  });
+}
+
+async function leaveReader() {
+  if (dirty && !(await askSave())) return;
+  closeAnn();
+  closeFind();
   showHome();
-});
+}
+
+$<HTMLButtonElement>("b-home").addEventListener("click", () => void leaveReader());
 
 btnInvert.addEventListener("click", () => {
   container.classList.toggle("invert");
   btnInvert.classList.toggle("on");
+  btnInvert.classList.remove("pulse");
+  void btnInvert.offsetWidth; // Neustart der Animation erzwingen
+  btnInvert.classList.add("pulse");
   glass?.invalidate();
 });
 
@@ -520,21 +552,36 @@ findInput.addEventListener("keydown", (e) => {
   else if (e.key === "Escape") { e.preventDefault(); closeFind(); }
 });
 
+const btnFind = $<HTMLButtonElement>("b-find");
+
+/** Das Suchfeld haengt am Suchknopf - zieht man den weg, folgt es. */
+function placeFindbar() {
+  if (findbar.hidden) return;
+  const b = btnFind.getBoundingClientRect();
+  const w = findbar.offsetWidth || 320;
+  const x = Math.min(Math.max(b.left + b.width / 2 - w / 2, 12), window.innerWidth - w - 12);
+  findbar.style.left = Math.round(x) + "px";
+  findbar.style.top = Math.round(b.bottom + 10) + "px";
+  findbar.style.translate = "0 0";
+}
+
 function openFind() {
   findbar.hidden = false;
+  placeFindbar();
+  btnFind.classList.add("on");
   findInput.select();
   findInput.focus();
 }
 
 function closeFind() {
   findbar.hidden = true;
+  btnFind.classList.remove("on");
   findInput.value = "";
   findCount.textContent = "";
   dispatchFind(false);
 }
 
-$<HTMLButtonElement>("b-find").addEventListener("click", openFind);
-$<HTMLButtonElement>("find-close").addEventListener("click", closeFind);
+btnFind.addEventListener("click", () => (findbar.hidden ? openFind() : closeFind()));
 $<HTMLButtonElement>("find-next").addEventListener("click", () => dispatchFind(true));
 $<HTMLButtonElement>("find-prev").addEventListener("click", () => dispatchFind(true, true));
 
@@ -560,7 +607,7 @@ window.addEventListener("keydown", (e) => {
   else if (e.key === "F3") { e.preventDefault(); dispatchFind(true, e.shiftKey); }
   else if (e.key === "Escape") {
     if (!findbar.hidden) { e.preventDefault(); closeFind(); }
-    else if (ann.classList.contains("open")) { e.preventDefault(); closeAnn(); }
+    else if (anngroup.classList.contains("open")) { e.preventDefault(); closeAnn(); }
   }
   else if (!ctrl && !typing) {
     if (k === "m") { openAnn(); setTool("mark"); }
@@ -571,6 +618,121 @@ window.addEventListener("keydown", (e) => {
 });
 
 window.addEventListener("beforeunload", (e) => { if (dirty) e.preventDefault(); });
+
+// ---------- Verschiebbare Knoepfe ----------
+
+const POSKEY = "folio.pos";
+const SNAP = 90; // Umkreis, in dem der Knopf auf die Ausgangsstelle zurueckspringt
+const refreshers: (() => void)[] = [];
+
+function loadPos(): Record<string, { x: number; y: number }> {
+  try { return JSON.parse(localStorage.getItem(POSKEY) ?? "{}"); } catch { return {}; }
+}
+
+function savePos(p: Record<string, { x: number; y: number }>) {
+  try { localStorage.setItem(POSKEY, JSON.stringify(p)); } catch { /* egal */ }
+}
+
+function makeDraggable(el: HTMLElement, key: string) {
+  let home: { x: number; y: number } | null = null;
+  let sx = 0, sy = 0, ox = 0, oy = 0, moved = false;
+
+  const applyFixed = (x: number, y: number) => {
+    el.style.left = Math.round(x) + "px";
+    el.style.top = Math.round(y) + "px";
+    el.style.right = "auto";
+    el.style.bottom = "auto";
+    el.style.translate = "0 0";
+    placeFindbar();
+  };
+
+  /** Ausgangsstelle messen: dafuer die eigenen Angaben kurz abraeumen,
+   *  damit wieder die Regel aus dem Stylesheet greift. */
+  const measureHome = () => {
+    const keep = {
+      left: el.style.left, top: el.style.top,
+      right: el.style.right, bottom: el.style.bottom,
+      translate: el.style.translate,
+    };
+    el.style.left = el.style.top = el.style.right = el.style.bottom = el.style.translate = "";
+    const r = el.getBoundingClientRect();
+    Object.assign(el.style, keep);
+    return { x: r.x, y: r.y };
+  };
+
+  // Erst messen, wenn das Element sichtbar ist - versteckt liefert es Null.
+  refreshers.push(() => {
+    home = measureHome();
+    const s = loadPos()[key];
+    if (s) applyFixed(s.x, s.y);
+  });
+
+  let active = false;
+
+  el.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest("input")) return;
+    const r = el.getBoundingClientRect();
+    sx = e.clientX; sy = e.clientY; ox = r.x; oy = r.y;
+    moved = false;
+    active = true;
+    el.classList.remove("settling");
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+  });
+
+  const move = (e: PointerEvent) => {
+    if (!active) return;
+    const dx = e.clientX - sx;
+    const dy = e.clientY - sy;
+    if (!moved) {
+      if (Math.hypot(dx, dy) < 5) return;
+      // Erst jetzt den Zeiger einfangen. Frueher wuerde das den Klick auf
+      // die Knoepfe in der Gruppe auf die Gruppe umleiten.
+      moved = true;
+      el.classList.add("grabbing");
+      el.setPointerCapture(e.pointerId);
+    }
+    applyFixed(ox + dx, oy + dy);
+  };
+
+  const end = (e: PointerEvent) => {
+    if (!active) return;
+    active = false;
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", end);
+    window.removeEventListener("pointercancel", end);
+    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    el.classList.remove("grabbing");
+    if (!moved) return;
+    const r = el.getBoundingClientRect();
+    const p = loadPos();
+    if (home && Math.hypot(r.x - home.x, r.y - home.y) < SNAP) {
+      // Nah genug an der Ausgangsstelle: dorthin zurueckfedern.
+      el.classList.add("settling");
+      applyFixed(home.x, home.y);
+      delete p[key];
+      window.setTimeout(() => el.classList.remove("settling"), 460);
+    } else {
+      p[key] = { x: r.x, y: r.y };
+    }
+    savePos(p);
+    // Klick nach dem Ziehen unterdruecken
+    const swallow = (ev: Event) => { ev.stopPropagation(); ev.preventDefault(); };
+    el.addEventListener("click", swallow, { capture: true, once: true });
+  };
+}
+
+makeDraggable($<HTMLElement>("b-find"), "find");
+makeDraggable($<HTMLElement>("b-invert"), "invert");
+makeDraggable($<HTMLElement>("anngroup"), "ann");
+
+/** Nach dem Sichtbarwerden des Lesers Ausgangsstellen neu vermessen. */
+function refreshDrag() {
+  requestAnimationFrame(() => { for (const f of refreshers) f(); });
+}
+window.addEventListener("resize", refreshDrag);
 
 // ---------- Dateien von aussen ----------
 

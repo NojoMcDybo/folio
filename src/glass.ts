@@ -16,8 +16,8 @@
 
 export type Painter = (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
 
-/** Aufloesung des Hintergrundabzugs. Unter 1, weil Glas ohnehin streut. */
-const SCALE = 0.6;
+/** Aufloesung des Hintergrundabzugs, 1 = volle Fenstergroesse. */
+const SCALE = 1;
 
 const VS = `#version 300 es
 in vec2 aPos;
@@ -102,19 +102,10 @@ void main() {
   // Koerper: unscharfe Fassung, ohne Versatz
   vec3 body = texture(uBlur, vec2(uv.x, 1.0 - uv.y)).rgb;
 
+  // Nur Brechung und Toenung. Keine helle Kante, kein Glanzlicht -
+  // das Glas zeigt ausschliesslich, was dahinter liegt.
   vec3 col = mix(body, refr, t2);
   col = mix(col, uTint.rgb, uTint.a);
-
-  // Glanz von oben links, Schatten gegenueber
-  vec2 L = normalize(vec2(-0.55, -0.83));
-  float sp = pow(max(dot(n, L), 0.0), 7.0) * smoothstep(0.0, 0.35, t);
-  col += vec3(1.0) * sp * 0.5;
-  float sh = pow(max(dot(n, -L), 0.0), 7.0) * t;
-  col -= vec3(0.09) * sh;
-
-  // Haarfeine helle Kante direkt am Rand
-  float rim = smoothstep(2.0, 0.0, abs(d + 1.0));
-  col += vec3(1.0) * rim * (0.14 + 0.10 * max(dot(n, L), 0.0));
 
   float a = 1.0 - smoothstep(-1.0, 0.5, d);
   outColor = vec4(col, a);
@@ -311,7 +302,7 @@ export class GlassLayer {
         const tint = el.dataset.tint;
         const [tr, tg, tb, ta] = tint
           ? tint.split(",").map(Number)
-          : [0.06, 0.06, 0.08, 0.34];
+          : [0.05, 0.05, 0.07, 0.52];
         // Alles in Geraetepixeln, damit gl_FragCoord im Shader passt.
         const k = this.dpr;
         gl.uniform1f(this.uni(this.pGlass, "uRadius"), rad * k);
