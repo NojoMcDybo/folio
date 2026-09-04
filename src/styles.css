@@ -21,7 +21,11 @@ html, body {
   user-select: none;
 }
 
+/* ---------- Leiste ---------- */
+
 #bar {
+  position: relative;
+  z-index: 30;
   height: var(--bar-h);
   display: flex;
   align-items: center;
@@ -32,11 +36,17 @@ html, body {
 }
 
 .grow { flex: 1; }
+.sep { width: 1px; height: 20px; background: var(--line); }
+.group { display: flex; gap: 4px; }
 
-#file { color: var(--dim); font-size: 12px; }
-#pages { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+#file, #pages { color: var(--dim); font-size: 12px; }
+#pages { font-variant-numeric: tabular-nums; }
 
-button {
+/* Bewusst auf unsere eigene Huelle begrenzt. Eine nackte `button`-Regel
+   wuerde auch die Knoepfe faerben, die PDF.js in seine schwebenden
+   Werkzeugbalken einbaut - die wurden dadurch zu schwarzen Kaesten. */
+#bar button,
+#findbar button {
   height: 26px;
   min-width: 26px;
   padding: 0 10px;
@@ -48,73 +58,88 @@ button {
   cursor: pointer;
 }
 
-button:hover { background: #2c2f35; }
-button:active { transform: translateY(1px); }
+#bar button:hover:not(:disabled),
+#findbar button:hover:not(:disabled) { background: #2c2f35; }
+#bar button:active:not(:disabled),
+#findbar button:active:not(:disabled) { transform: translateY(1px); }
+#bar button:disabled { opacity: 0.4; cursor: default; }
+#bar button.on { border-color: var(--accent); color: var(--accent); }
 
-.group { display: flex; gap: 4px; }
+#color {
+  width: 28px;
+  height: 26px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #24262b;
+  cursor: pointer;
+}
 
-#btn-invert.on { border-color: var(--accent); color: var(--accent); }
+/* ---------- Viewer ---------- */
 
-#viewer {
-  position: relative; /* Bezugspunkt fuer offsetTop der Seiten */
-  height: calc(100% - var(--bar-h));
+/* PDFViewer verlangt einen absolut positionierten Container. */
+#container {
+  position: absolute;
+  top: var(--bar-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
   overflow: auto;
-  padding: 20px 0 60px;
+  background: var(--bg);
   scrollbar-color: #3a3d44 transparent;
 }
 
+#viewer { --page-margin: 16px; }
+
+.pdfViewer .page {
+  border: none;
+  margin: 0 auto var(--page-margin);
+  background: #23262c;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
+}
+
+.pdfViewer .page:first-child { margin-top: 20px; }
+
+/* ---------- Ablegeflaeche ---------- */
+
 #drop {
-  height: 60%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: absolute;
+  top: calc(var(--bar-h) + 40px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, 80%);
+  padding: 60px 20px;
+  text-align: center;
   color: var(--dim);
   border: 1px dashed var(--line);
   border-radius: 10px;
-  margin: 40px auto;
-  max-width: 420px;
+  pointer-events: none;
+  z-index: 5;
 }
 
-#viewer.dragover #drop { border-color: var(--accent); color: var(--accent); }
+#drop.gone { display: none; }
+body.dragover #drop { border-color: var(--accent); color: var(--accent); }
 
-.page {
-  position: relative;
-  margin: 0 auto 16px;
-  /* Platzhalter in Grundfarbe. Weiss wird die Seite erst, wenn wirklich
-     etwas drauf ist - sonst blitzt beim Scrollen ein weisses Rechteck auf. */
-  background: #23262c;
-  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
-  transition: background 120ms linear;
+/* ---------- Farb-Invertierung ----------
+   Nur das Seitenbild wird gedreht, nicht die Annotationsebene.
+   Sonst wuerde aus einem gelben Marker ein blauer.
+   contrast(0.8) vor der Invertierung: Papierweiss wird ein weiches #1a
+   statt hartem Schwarz, schwarze Schrift ein gedaempftes Weiss. */
+
+#container.invert .pdfViewer .page { background: #1a1a1a; }
+#container.invert .pdfViewer .canvasWrapper canvas {
+  filter: contrast(0.8) invert(1) hue-rotate(180deg);
 }
-
-.page.ready { background: #fff; }
-
-.page canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-/* Farb-Invertierung.
-   contrast(0.8) VOR der Invertierung staucht den Tonwertumfang leicht:
-   aus Papierweiss wird dann ein weiches #1a statt hartem Schwarz und aus
-   schwarzer Schrift ein gedaempftes Weiss. Reines Schwarz-auf-Weiss
-   umgedreht ist zum Lesen zu kontrastreich.
-   hue-rotate(180deg) dreht den Farbton zurueck, damit Blau blau bleibt. */
-#viewer.invert .page,
-#viewer.invert .page.ready { background: #1a1a1a; }
-#viewer.invert .page canvas { filter: contrast(0.8) invert(1) hue-rotate(180deg); }
 
 /* ---------- Suchleiste ---------- */
 
-/* display:flex wuerde das hidden-Attribut ueberstimmen, deshalb explizit. */
 #findbar[hidden] { display: none; }
 
 #findbar {
   position: absolute;
   top: calc(var(--bar-h) + 8px);
   right: 16px;
-  z-index: 20;
+  z-index: 25;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -140,17 +165,50 @@ button:active { transform: translateY(1px); }
 #find-q:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
 
 #find-count {
-  min-width: 70px;
+  min-width: 76px;
   text-align: right;
   color: var(--dim);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
-/* Treffer liegen als farbige Flaeche ueber der gerenderten Schrift.
-   Die Textebene selbst bleibt unsichtbar, deshalb nur Hintergrund. */
-::highlight(folio-find) { background-color: rgba(155, 140, 255, 0.45); }
+/* ---------- PDF.js-Elemente an unser Aussehen anpassen ---------- */
 
-/* Auswahl in der Textebene */
+/* body hat user-select:none, damit die Huelle sich wie eine App anfuehlt
+   und nicht wie eine Webseite. Die Textebene braucht die Ausnahme -
+   ohne sie gibt es weder Kopieren noch Textmarker. */
+#container .textLayer,
+#container .textLayer span,
+#container .textLayer br {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 .textLayer ::selection { background: rgba(155, 140, 255, 0.35); }
-.textLayer { z-index: 2; }
+.textLayer .highlight { background: rgba(155, 140, 255, 0.4); border-radius: 2px; }
+.textLayer .highlight.selected { background: rgba(155, 140, 255, 0.75); }
+
+/* Der schwebende Mini-Werkzeugbalken, den PDF.js neben einer
+   ausgewaehlten Annotation einblendet. Aufbau gehoert der Bibliothek,
+   Aussehen uns. Der #container davor hebt die Spezifitaet ueber die
+   Regeln aus pdf_viewer.css. */
+#container .editToolbar {
+  --editor-toolbar-bg-color: #1e2024;
+  --editor-toolbar-fg-color: #e8e6e3;
+  --editor-toolbar-border-color: #3a3d44;
+  --editor-toolbar-hover-border-color: #4a4e57;
+  --editor-toolbar-hover-bg-color: #2c2f35;
+  --editor-toolbar-hover-fg-color: #ffffff;
+  --editor-toolbar-focus-outline-color: var(--accent);
+  --editor-toolbar-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  --editor-toolbar-height: 30px;
+  --editor-toolbar-padding: 3px;
+  border-radius: 8px;
+}
+
+/* Auswahlrahmen um eine angefasste Annotation in unserer Akzentfarbe. */
+#container .annotationEditorLayer {
+  --outline-color: var(--accent);
+  --hover-outline-color: var(--accent);
+  --selected-outline-color: var(--accent);
+}

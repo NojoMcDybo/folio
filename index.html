@@ -4,19 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Folio</title>
-    <link rel="stylesheet" href="/src/styles.css" />
+    <!-- styles.css wird in main.ts NACH pdf_viewer.css importiert,
+         sonst gewinnen bei gleicher Spezifitaet deren Regeln. -->
   </head>
   <body>
     <header id="bar">
       <button id="btn-open" title="Öffnen (Strg+O)">Öffnen</button>
       <button id="btn-find" title="Suchen (Strg+F)">Suchen</button>
-      <span id="file"></span>
+
+      <span class="sep"></span>
+
+      <div class="group" id="tools">
+        <button id="t-none" class="on" title="Auswahl (V)">Auswahl</button>
+        <button id="t-mark" title="Textmarker (M)">Marker</button>
+        <button id="t-ink" title="Zeichnen (Z)">Stift</button>
+        <button id="t-text" title="Textfeld (T)">Text</button>
+      </div>
+      <input id="color" type="color" value="#ffd23f" title="Farbe" />
+      <button id="btn-save" title="Speichern (Strg+S)" disabled>Speichern</button>
+
       <span class="grow"></span>
+      <span id="file"></span>
       <span id="pages"></span>
       <div class="group">
-        <button id="btn-zoom-out" title="Kleiner (Strg+−)">−</button>
+        <button id="btn-zoom-out" title="Kleiner">−</button>
         <button id="btn-zoom-reset" title="Passbreite (Strg+0)">100%</button>
-        <button id="btn-zoom-in" title="Größer (Strg++)">+</button>
+        <button id="btn-zoom-in" title="Größer">+</button>
       </div>
       <button id="btn-invert" title="Invertieren (Strg+I)">Invert</button>
     </header>
@@ -29,9 +42,8 @@
       <button id="find-close" title="Schließen (Esc)">✕</button>
     </div>
 
-    <main id="viewer">
-      <div id="drop">PDF hierher ziehen</div>
-    </main>
+    <div id="container"><div id="viewer" class="pdfViewer"></div></div>
+    <div id="drop">PDF hierher ziehen</div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
