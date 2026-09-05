@@ -166,7 +166,7 @@ void main() {
     float ly = (frag.y - uRect.y) / uRect.w;
     float f = 1.0 - smoothstep(uFill - 0.006, uFill + 0.006, ly);
     float front = exp(-pow((ly - uFill) / 0.035, 2.0));
-    vec3 lightCol = vec3(0.66, 0.61, 1.0);
+    vec3 lightCol = vec3(1.0, 1.0, 1.0);
     // Der leere Teil glimmt schwach, sonst waere der Stab ueber dem
     // schwarzen Rand gar nicht zu finden.
     col += lightCol * (0.05 + 0.05 * g) * (0.4 + 0.6 * dome);

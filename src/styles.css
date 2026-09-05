@@ -143,8 +143,12 @@ body.no-gl .ico.danger:hover { background: #d13b3b; color: #fff; }
   right: 13px;
   translate: 0 -50%;
   width: 9px;
-  height: 46vh;
-  min-height: 170px;
+  /* Ruhezustand ist ein nebensaechliches Detail, kein eigener Balken -
+     etwa knopfgross, nicht die frueheren 46vh. Waechst erst beim Hovern
+     zum eigentlichen Scrollfeld. */
+  height: 6vh;
+  min-height: 34px;
+  max-height: 46px;
   border-radius: 999px;
   transition:
     width 0.36s var(--spring),

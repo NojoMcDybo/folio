@@ -242,6 +242,11 @@ const pdfViewer = new PDFViewer({
   annotationEditorMode: EditorType.NONE,
   removePageBorders: true,
   enableHighlightFloatingButton: true,
+  // Ohne diese Liste bleibt PDF.js' interne Farbtabelle null - ihre eigene
+  // Telemetrie beim Anlegen einer Markierung greift trotzdem darauf zu und
+  // wirft einen TypeError (harmlos, aber jetzt behoben). Unsere eigene
+  // Farbauswahl (colorInput) ist davon unabhaengig.
+  annotationEditorHighlightColors: "yellow=#FFFF98,green=#53FFBC,blue=#80EBFF,pink=#FFCBE6,red=#FF4F5F",
 });
 linkService.setViewer(pdfViewer);
 
@@ -640,10 +645,10 @@ function paintProgress() {
   scroller.dataset.fill = String(Math.min(1, Math.max(0.004, p)));
 }
 
-/** Fuenf unsichtbare Felder von oben nach unten: schnell hoch, langsam
- *  hoch, Ruhe, langsam runter, schnell runter. */
-const SPEED = [-1600, -300, 0, 300, 1600];
-let zone = 2;
+/** Drei unsichtbare Felder von oben nach unten: schnell hoch, Ruhe,
+ *  schnell runter - die langsamen Zwischenstufen sind raus. */
+const SPEED = [-1600, 0, 1600];
+let zone = 1;
 let autoId = 0;
 let lastTick = 0;
 
@@ -657,7 +662,7 @@ function tick(t: number) {
 function stopAuto() {
   if (autoId) cancelAnimationFrame(autoId);
   autoId = 0;
-  zone = 2;
+  zone = 1;
 }
 
 let wideTimer = 0;
@@ -683,7 +688,7 @@ scroller.addEventListener("pointermove", (e) => {
   if (!scroller.classList.contains("wide")) return;
   const r = scroller.getBoundingClientRect();
   const t = (e.clientY - r.y) / Math.max(1, r.height);
-  zone = Math.min(4, Math.max(0, Math.floor(t * 5)));
+  zone = Math.min(2, Math.max(0, Math.floor(t * 3)));
 });
 
 // ---------- Tastatur ----------
