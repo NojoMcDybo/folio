@@ -65,6 +65,7 @@ uniform float uRadius;
 uniform vec4 uTint;
 uniform float uDpr;     // Geraetepixel je CSS-Pixel
 uniform float uGlow;    // 0 = ruhig, 1 = angefasst, darueber Blitz
+uniform float uLumLod;  // Grobstufe, aus der die Grundhelligkeit kommt
 uniform float uHasIcon;
 uniform vec3 uIconCol;
 uniform sampler2D uBack;
@@ -94,17 +95,22 @@ void main() {
     sdBox(p + e.yx, hs, r) - sdBox(p - e.yx, hs, r)
   ) + 1e-6);
 
-  // Kuppel: u laeuft von 0 an der Kante bis 1 im Kern. Die Hoehe folgt
-  // einem Kreisquerschnitt, die Neigung faellt weich bis zur Mitte ab -
-  // dadurch bricht die ganze Flaeche und nicht nur der Rand.
+  // Kuppel: u laeuft von 0 an der Kante bis 1 im Kern, die Hoehe folgt
+  // einem Kreisquerschnitt.
   float R = min(hs.x, hs.y);
   float u = clamp(-d / R, 0.0, 1.0);
   float dome = sqrt(max(0.0, 1.0 - (1.0 - u) * (1.0 - u)));
-  float slope = pow(1.0 - u, 1.35);
+
+  // Zwei Anteile: ein weicher ueber die ganze Flaeche und die echte
+  // Kuppelneigung, die zur Kante hin steil wird - dort steht das Glas
+  // fast senkrecht und bricht entsprechend hart.
+  float soft = pow(1.0 - u, 1.35);
+  float rim = min((1.0 - u) / max(dome, 0.16), 6.0);
+  float bend = soft * 0.55 + rim * 0.75;
 
   // Nach innen abtasten: die Kuppel wirkt wie eine Lupe.
-  float amp = clamp(R * 0.42, 7.0 * uDpr, 30.0 * uDpr);
-  vec2 off = -n * slope * amp / uRes;
+  float amp = clamp(R * 0.30, 5.0 * uDpr, 22.0 * uDpr);
+  vec2 off = -n * bend * amp / uRes;
 
   vec2 uv = frag / uRes;
   vec3 refr;
@@ -114,34 +120,40 @@ void main() {
 
   // Koerper: unscharfe Fassung, wandert leicht mit
   vec2 buv = uv + off * 0.45;
-  vec3 body = texture(uBlur, vec2(buv.x, 1.0 - buv.y)).rgb;
+  vec3 blurCol = texture(uBlur, vec2(buv.x, 1.0 - buv.y)).rgb;
 
-  // Keine helle Kante, kein Glanzlicht - nur Brechung und Toenung.
-  float mixw = clamp(0.30 + 0.75 * slope, 0.0, 1.0);
-  vec3 col = mix(body, refr, mixw);
-  col = mix(col, uTint.rgb, uTint.a);
+  float mixw = clamp(0.30 + 0.55 * min(bend, 1.6), 0.0, 1.0);
+  vec3 col = mix(blurCol, refr, mixw);
 
+  // Licht des Symbols: Kern, enger Hof und ein breiter Schein. Der breite
+  // kommt aus einer groben Stufe der Symboltextur - billiger als viele
+  // Proben und weit genug, um den ganzen Knopf zu erreichen.
+  float core = 0.0, halo = 0.0, wide = 0.0;
   if (uHasIcon > 0.5) {
-    // Das Symbol liegt unter der Kuppel und wird mitverzerrt, aber
-    // schwaecher - es sitzt ja nicht ganz unten.
     vec2 iuv = (frag - uRect.xy) / uRect.zw;
     vec2 ioff = off * uRes / uRect.zw * 0.55;
-    float core = texture(uIcon, iuv + ioff).a;
-
-    // Zwei Ringe als billiger Lichthof
-    float halo = 0.0;
-    for (int i = 0; i < 6; i++) {
-      float a = 1.0471976 * float(i);
-      vec2 dir = vec2(cos(a), sin(a));
-      halo += texture(uIcon, iuv + ioff + dir * (3.5 * uDpr) / uRect.zw).a;
-      halo += texture(uIcon, iuv + ioff + dir * (10.0 * uDpr) / uRect.zw).a * 0.55;
-    }
-    halo /= 9.3;
-
-    float lightCore = core * (0.92 + 0.75 * uGlow);
-    float lightHalo = halo * (0.14 + 0.60 * uGlow) * (0.35 + 0.65 * dome);
-    col += uIconCol * (lightCore + lightHalo);
+    core = texture(uIcon, iuv + ioff).a;
+    halo = textureLod(uIcon, iuv + ioff, 2.5).a;
+    wide = clamp(textureLod(uIcon, iuv + ioff * 0.4, 4.6).a * 7.0, 0.0, 1.0);
   }
+
+  // Toenung nach dem Hintergrund: je heller der Grund, desto dunkler die
+  // Scheibe. Ueber dunklem Grund bleibt fast nichts uebrig - dort traegt
+  // das Licht des Symbols. Leuchtet es, wird die Scheibe klarer.
+  vec2 cuv = (uRect.xy + hs) / uRes;
+  vec3 amb = textureLod(uBlur, vec2(cuv.x, 1.0 - cuv.y), uLumLod).rgb;
+  float lum = dot(amb, vec3(0.2126, 0.7152, 0.0722));
+  float ta = uTint.a * mix(0.18, 1.0, smoothstep(0.02, 0.62, lum));
+  ta *= 1.0 - 0.35 * clamp(wide * (0.5 + uGlow), 0.0, 1.0);
+  col = mix(col, uTint.rgb, ta);
+
+  // Kern und Hof leuchten, der breite Schein hebt den ganzen Koerper an
+  // und tritt an der duennen Kante wieder aus.
+  float g = uGlow;
+  col += uIconCol * core * (0.92 + 0.75 * g);
+  col += uIconCol * halo * (0.45 + 1.10 * g) * (0.30 + 0.70 * dome);
+  col += uIconCol * wide * (0.16 + 0.55 * g) * (0.35 + 0.65 * dome);
+  col += uIconCol * wide * (0.10 + 0.30 * g) * (1.0 - dome);
 
   float a = 1.0 - smoothstep(-1.0, 0.5, d);
   outColor = vec4(col, a);
@@ -168,11 +180,17 @@ function compile(gl: WebGL2RenderingContext, vs: string, fs: string) {
   return p;
 }
 
-function makeTarget(gl: WebGL2RenderingContext, w: number, h: number) {
+function makeTarget(gl: WebGL2RenderingContext, w: number, h: number, mips = false) {
   const tex = gl.createTexture() as WebGLTexture;
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  // Die groben Stufen liefern die Grundhelligkeit hinter einem Element.
+  if (mips) gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(
+    gl.TEXTURE_2D,
+    gl.TEXTURE_MIN_FILTER,
+    mips ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR
+  );
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -331,7 +349,7 @@ export class GlassLayer {
     const bw = Math.max(2, Math.round(this.back.width / 2));
     const bh = Math.max(2, Math.round(this.back.height / 2));
     this.a = makeTarget(this.gl, bw, bh);
-    this.b = makeTarget(this.gl, bw, bh);
+    this.b = makeTarget(this.gl, bw, bh, true);
     this.dirty = true;
   }
 
@@ -453,7 +471,9 @@ export class GlassLayer {
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    // Grobstufen: aus ihnen holt sich der Shader den breiten Schein.
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -498,6 +518,10 @@ export class GlassLayer {
         this.quad(this.pBlur, [dst.w, dst.h], [0, 0, dst.w, dst.h]);
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      // Grobstufen der unscharfen Fassung neu bilden - daraus kommt die
+      // Grundhelligkeit, nach der sich die Toenung richtet.
+      gl.bindTexture(gl.TEXTURE_2D, this.b.tex);
+      gl.generateMipmap(gl.TEXTURE_2D);
       gl.enable(gl.BLEND);
       this.dirty = false;
     }
@@ -522,9 +546,11 @@ export class GlassLayer {
         const cs = getComputedStyle(el);
         const rad = parseFloat(cs.borderTopLeftRadius) || 18;
         const tint = el.dataset.tint;
+        // Der vierte Wert ist die staerkste Toenung - erreicht wird sie
+        // nur ueber hellem Grund.
         const [tr, tg, tb, ta] = tint
           ? tint.split(",").map(Number)
-          : [0.05, 0.05, 0.07, 0.52];
+          : [0.05, 0.05, 0.07, 0.4];
 
         // Symboltextur zuerst, sie belegt Einheit 2.
         gl.activeTexture(gl.TEXTURE2);
@@ -534,6 +560,13 @@ export class GlassLayer {
         // Alles in Geraetepixeln, damit gl_FragCoord im Shader passt.
         gl.uniform1f(this.uni(this.pGlass, "uRadius"), rad * k);
         gl.uniform1f(this.uni(this.pGlass, "uDpr"), k);
+        // Grobstufe, die ungefaehr der Flaeche des Elements entspricht:
+        // die unscharfe Fassung liegt in halber CSS-Aufloesung.
+        const span = Math.max(4, Math.min(b.width, b.height)) / 2;
+        gl.uniform1f(
+          this.uni(this.pGlass, "uLumLod"),
+          Math.min(8, Math.max(1, Math.log2(span)))
+        );
         gl.uniform4f(this.uni(this.pGlass, "uTint"), tr, tg, tb, ta);
         gl.uniform1f(this.uni(this.pGlass, "uHasIcon"), ico ? 1 : 0);
         gl.uniform1f(this.uni(this.pGlass, "uGlow"), Math.min(1.4, ico?.glow ?? 0));

@@ -40,8 +40,10 @@ npm run tauri dev      # Entwicklung mit Hot Reload
 npm run tauri build    # Release + NSIS-Installer
 ```
 
-Hinweis: Falls `NODE_ENV=production` gesetzt ist, lässt npm die devDependencies weg.
-Die `.npmrc` im Projekt fängt das ab.
+Hinweis: Werkzeuge, die aus einer Umgebung mit `NODE_ENV=production` heraus starten
+(etwa ein Terminal, das eine Electron-App geerbt hat), lassen die devDependencies weg.
+Die `.npmrc` im Projekt (`include=dev`) fängt das ab. In einer normalen Eingabe-
+aufforderung ist nichts zu tun.
 
 ## Lizenzen der Bausteine
 
