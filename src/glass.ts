@@ -374,15 +374,15 @@ export class GlassLayer {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
-  /** Helligkeit eines Symbols: Grundwert, heller unter der Maus, heller
-   *  wenn das Werkzeug an ist. */
+  /** Helligkeit eines Symbols: leuchtet immer ein wenig von selbst,
+   *  heller unter der Maus, heller wenn das Werkzeug an ist. */
   private glowOf(owner: HTMLElement, cs: CSSStyleDeclaration) {
     const hover = owner.matches(":hover") ? 1 : 0;
     const on = owner.classList.contains("on") ? 1 : 0;
     const dim = parseFloat(cs.opacity) || 1;
     return {
       alpha: Math.min(1, 0.62 + 0.24 * hover + 0.16 * on) * dim,
-      glow: (0.34 * hover + 0.34 * on) * dim,
+      glow: (0.34 + 0.10 * hover + 0.34 * on) * dim,
       on,
     };
   }

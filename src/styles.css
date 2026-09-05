@@ -147,7 +147,7 @@ body.no-gl .ico.danger:hover { background: #d13b3b; color: #fff; }
   top: calc(64px + var(--scroller-p) * (100% - 128px));
   right: 13px;
   translate: 0 -50%;
-  width: 5px;
+  width: 7px;
   height: 56px;
   border-radius: 999px;
   cursor: grab;
@@ -170,11 +170,37 @@ body.no-gl .ico.danger:hover { background: #d13b3b; color: #fff; }
 
 #scroller.dragging {
   cursor: grabbing;
-  width: 8px;
+  width: 9px;
   /* Keine top-Transition beim Ziehen - der Griff soll der Maus verzoegerungsfrei
      folgen, nicht ihr hinterher-eiern. */
   transition: width 0.15s var(--ease);
 }
+
+/* Lupe: der Suchknopf wird beim Ziehen ueber die Seite dazu. Der Ring
+   bleibt normales Glas (GlassLayer malt dort die Kuppel wie ueberall
+   sonst), nur die Mitte zeigt die scharfe, echte Vergroesserung. */
+#lens {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+#lens-cv {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: block;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+/* Der Knopf selbst bleibt fuer die Ablage-Logik an Ort und Stelle,
+   waehrend er als Lupe zu sehen ist - nur unsichtbar. */
+#b-find.lens-hidden { opacity: 0; }
 
 #anngroup {
   bottom: 22px;

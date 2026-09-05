@@ -634,6 +634,81 @@ btnFind.addEventListener("click", () => (findbar.hidden ? openFind() : closeFind
 $<HTMLButtonElement>("find-next").addEventListener("click", () => dispatchFind(true));
 $<HTMLButtonElement>("find-prev").addEventListener("click", () => dispatchFind(true, true));
 
+// ---------- Lupe ----------
+// Der Suchknopf ist frei verschiebbar (makeDraggable weiter unten). Zieht
+// man ihn, wird er unterwegs zu einer echten Lupe: die Mitte zeigt den
+// tatsaechlich vergroesserten Seitenausschnitt, direkt aus der Seiten-
+// Canvas abgetastet statt per CSS-Zoom, am Rand bleibt gewoehnliches Glas -
+// dort malt GlassLayer die Kuppel wie bei jedem anderen Knopf.
+
+const lens = $<HTMLElement>("lens");
+const lensCv = $<HTMLCanvasElement>("lens-cv");
+const lensCtx = lensCv.getContext("2d") as CanvasRenderingContext2D;
+const LENS_ZOOM = 2.5;
+const LENS_SIZE = 96; // CSS-Px der scharfen Mitte, siehe #lens-cv im CSS
+
+function overContainer(x: number, y: number) {
+  const r = container.getBoundingClientRect();
+  return x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + r.height;
+}
+
+function paintLens(x: number, y: number) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const size = Math.round(LENS_SIZE * dpr);
+  if (lensCv.width !== size) { lensCv.width = size; lensCv.height = size; }
+  lensCtx.clearRect(0, 0, size, size);
+
+  const pages = container.querySelectorAll<HTMLCanvasElement>(".pdfViewer .canvasWrapper canvas");
+  for (const cv of pages) {
+    const r = cv.getBoundingClientRect();
+    if (x < r.x || x > r.x + r.width || y < r.y || y > r.y + r.height) continue;
+    const sx = ((x - r.x) / r.width) * cv.width;
+    const sy = ((y - r.y) / r.height) * cv.height;
+    const sw = (LENS_SIZE / LENS_ZOOM) * (cv.width / r.width);
+    const sh = (LENS_SIZE / LENS_ZOOM) * (cv.height / r.height);
+    lensCtx.drawImage(cv, sx - sw / 2, sy - sh / 2, sw, sh, 0, 0, size, size);
+    break;
+  }
+
+  // Invertiert-Modus faerbt die Seiten-Canvas per CSS-Filter um - sonst
+  // zeigt die Lupe die falschen Farben.
+  lensCv.style.filter = container.classList.contains("invert")
+    ? "contrast(0.8) invert(1) hue-rotate(180deg)"
+    : "";
+}
+
+btnFind.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  let lensing = false;
+
+  const onMove = (ev: PointerEvent) => {
+    if (overContainer(ev.clientX, ev.clientY)) {
+      lensing = true;
+      lens.style.left = ev.clientX + "px";
+      lens.style.top = ev.clientY + "px";
+      lens.hidden = false;
+      btnFind.classList.add("lens-hidden");
+      paintLens(ev.clientX, ev.clientY);
+    } else if (lensing) {
+      lensing = false;
+      lens.hidden = true;
+      btnFind.classList.remove("lens-hidden");
+    }
+  };
+
+  const onUp = () => {
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onUp);
+    lens.hidden = true;
+    btnFind.classList.remove("lens-hidden");
+  };
+
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointercancel", onUp);
+});
+
 // ---------- Bildlaufleiste ----------
 
 const scroller = $<HTMLElement>("scroller");
@@ -653,7 +728,7 @@ function paintProgress() {
 /** Fuenf unsichtbare Felder von oben nach unten: schnell hoch, langsam
  *  hoch (Lesetempo), Ruhe, langsam runter (Lesetempo), schnell runter
  *  (Ueberfliegen). Nur per Hover erreichbar. */
-const SPEED = [-1600, -300, 0, 300, 1600];
+const SPEED = [-1600, -150, 0, 150, 1600];
 let zone = 2;
 let autoId = 0;
 let lastTick = 0;
@@ -678,9 +753,11 @@ function stopAuto() {
 }
 
 let wideTimer = 0;
+let leaveTimer = 0;
 
 scroller.addEventListener("pointerenter", () => {
   window.clearTimeout(wideTimer);
+  window.clearTimeout(leaveTimer);
   // Erst nach einer Sekunde Verweilen - sonst schnappt der Stab zu, wenn
   // die Maus nur vorbeizieht.
   wideTimer = window.setTimeout(() => {
@@ -692,8 +769,13 @@ scroller.addEventListener("pointerenter", () => {
 scroller.addEventListener("pointerleave", () => {
   if (dragging) return;
   window.clearTimeout(wideTimer);
-  scroller.classList.remove("wide");
-  stopAuto();
+  window.clearTimeout(leaveTimer);
+  // Noch eine Sekunde stehen lassen - wer nur kurz danebengreift, soll
+  // nicht sofort aus dem Scrollfeld fallen.
+  leaveTimer = window.setTimeout(() => {
+    scroller.classList.remove("wide");
+    stopAuto();
+  }, 1000);
 });
 
 scroller.addEventListener("pointermove", (e) => {
