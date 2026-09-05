@@ -11,7 +11,7 @@
  * Kuppeln: die Dicke waechst von der Kante bis zur Mitte, die Brechung
  * laeuft ueber die ganze Flaeche. Die Symbole liegen nicht darauf, sondern
  * darin - sie werden in eine Textur gezeichnet, mit der Kuppel verzerrt und
- * leuchten von innen. Beim Ueberfahren heller, beim Klick ein kurzer Blitz.
+ * leuchten von innen, unter der Maus heller.
  *
  * Je Bild:
  *   1. Hintergrund in ein 2D-Canvas malen (nur wenn er sich geaendert hat)
@@ -21,11 +21,9 @@
 
 export type Painter = (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
 
-/** Aufloesung des Hintergrundabzugs, 1 = volle Fenstergroesse. */
-const SCALE = 1;
-
-/** Dauer des Aufblitzens beim Klick in Millisekunden. */
-const FLASH = 300;
+/** Ueberabtastung der Symboltexturen: doppelt so fein wie der Bildschirm,
+ *  damit die Zeichen unter der Lupe nicht ausfransen. */
+const ICON_SS = 2;
 
 const VS = `#version 300 es
 in vec2 aPos;
@@ -66,6 +64,8 @@ uniform vec4 uTint;
 uniform float uDpr;     // Geraetepixel je CSS-Pixel
 uniform float uGlow;    // 0 = ruhig, 1 = angefasst, darueber Blitz
 uniform float uLumLod;  // Grobstufe, aus der die Grundhelligkeit kommt
+uniform float uIconLod; // Stufenversatz durch die Ueberabtastung
+uniform float uFill;    // Fuellstand von oben, 0 = aus
 uniform float uHasIcon;
 uniform vec3 uIconCol;
 uniform sampler2D uBack;
@@ -133,8 +133,8 @@ void main() {
     vec2 iuv = (frag - uRect.xy) / uRect.zw;
     vec2 ioff = off * uRes / uRect.zw * 0.55;
     core = texture(uIcon, iuv + ioff).a;
-    halo = textureLod(uIcon, iuv + ioff, 2.5).a;
-    wide = clamp(textureLod(uIcon, iuv + ioff * 0.4, 4.6).a * 7.0, 0.0, 1.0);
+    halo = textureLod(uIcon, iuv + ioff, 2.5 + uIconLod).a;
+    wide = clamp(textureLod(uIcon, iuv + ioff * 0.4, 4.6 + uIconLod).a * 7.0, 0.0, 1.0);
   }
 
   // Toenung nach dem Hintergrund: je heller der Grund, desto dunkler die
@@ -149,11 +149,30 @@ void main() {
 
   // Kern und Hof leuchten, der breite Schein hebt den ganzen Koerper an
   // und tritt an der duennen Kante wieder aus.
+  // Ueber hellem Grund traegt kein Leuchten: dort wird das Zeichen zur
+  // dunklen Silhouette, ueber dunklem leuchtet es.
   float g = uGlow;
-  col += uIconCol * core * (0.92 + 0.75 * g);
-  col += uIconCol * halo * (0.45 + 1.10 * g) * (0.30 + 0.70 * dome);
-  col += uIconCol * wide * (0.16 + 0.55 * g) * (0.35 + 0.65 * dome);
-  col += uIconCol * wide * (0.10 + 0.30 * g) * (1.0 - dome);
+  float bright = smoothstep(0.22, 0.60, lum);
+  float glowK = 1.0 - 0.8 * bright;
+  vec3 ink = mix(uIconCol * (1.0 + 0.55 * g), vec3(0.07, 0.07, 0.10), bright);
+  col = mix(col, ink, clamp(core * (0.88 + 0.12 * g), 0.0, 1.0));
+  col += uIconCol * halo * (0.45 + 1.10 * g) * (0.30 + 0.70 * dome) * glowK;
+  col += uIconCol * wide * (0.16 + 0.55 * g) * (0.35 + 0.65 * dome) * glowK;
+  col += uIconCol * wide * (0.10 + 0.30 * g) * (1.0 - dome) * glowK;
+
+  // Fuellstand: der obere Teil steht unter Licht. Die Front ist eine
+  // schmale helle Linie, damit man den Stand genau ablesen kann.
+  if (uFill > 0.0001) {
+    float ly = (frag.y - uRect.y) / uRect.w;
+    float f = 1.0 - smoothstep(uFill - 0.006, uFill + 0.006, ly);
+    float front = exp(-pow((ly - uFill) / 0.035, 2.0));
+    vec3 lightCol = vec3(0.66, 0.61, 1.0);
+    // Der leere Teil glimmt schwach, sonst waere der Stab ueber dem
+    // schwarzen Rand gar nicht zu finden.
+    col += lightCol * (0.05 + 0.05 * g) * (0.4 + 0.6 * dome);
+    col += lightCol * f * (0.20 + 0.34 * dome) * (0.85 + 0.5 * g);
+    col += lightCol * front * (0.22 + 0.3 * g);
+  }
 
   float a = 1.0 - smoothstep(-1.0, 0.5, d);
   outColor = vec4(col, a);
@@ -266,7 +285,6 @@ export class GlassLayer {
   private dirty = true;
   private painter: Painter = () => {};
   private icons = new WeakMap<Element, { tex: WebGLTexture; key: string; cv: HTMLCanvasElement }>();
-  private flashAt = new WeakMap<Element, number>();
 
   constructor(private canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", {
@@ -306,13 +324,6 @@ export class GlassLayer {
     gl.enable(gl.BLEND);
     gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-    const touched = (e: Event) => {
-      const t = e.target as HTMLElement | null;
-      this.flash(t?.closest?.(".ico, #swatch") as HTMLElement | null);
-    };
-    document.addEventListener("pointerdown", touched, true);
-    document.addEventListener("click", touched, true);
-
     this.resize();
     window.addEventListener("resize", () => this.resize());
     requestAnimationFrame(this.frame);
@@ -328,10 +339,6 @@ export class GlassLayer {
     this.dirty = true;
   }
 
-  /** Kurzes Aufblitzen ausloesen, auch ohne Maus (Tastenkuerzel). */
-  flash(el: Element | null) {
-    if (el) this.flashAt.set(el, performance.now());
-  }
 
   private resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -343,8 +350,10 @@ export class GlassLayer {
     this.canvas.style.width = this.w + "px";
     this.canvas.style.height = this.h + "px";
 
-    this.back.width = Math.max(2, Math.round(this.w * SCALE));
-    this.back.height = Math.max(2, Math.round(this.h * SCALE));
+    // Der Abzug liegt in Geraetepixeln, nicht in CSS-Pixeln: sonst wird
+    // das Gebrochene beim Zeichnen wieder hochskaliert und wirkt weich.
+    this.back.width = Math.max(2, Math.round(this.w * dpr));
+    this.back.height = Math.max(2, Math.round(this.h * dpr));
 
     const bw = Math.max(2, Math.round(this.back.width / 2));
     const bh = Math.max(2, Math.round(this.back.height / 2));
@@ -365,21 +374,14 @@ export class GlassLayer {
   }
 
   /** Helligkeit eines Symbols: Grundwert, heller unter der Maus, heller
-   *  wenn das Werkzeug an ist, plus kurzer Blitz nach dem Klick. */
+   *  wenn das Werkzeug an ist. */
   private glowOf(owner: HTMLElement, cs: CSSStyleDeclaration) {
-    let flash = 0;
-    const t0 = this.flashAt.get(owner);
-    if (t0 !== undefined) {
-      const f = 1 - (performance.now() - t0) / FLASH;
-      if (f > 0) flash = f * f;
-      else this.flashAt.delete(owner);
-    }
     const hover = owner.matches(":hover") ? 1 : 0;
     const on = owner.classList.contains("on") ? 1 : 0;
     const dim = parseFloat(cs.opacity) || 1;
     return {
-      alpha: Math.min(1, 0.62 + 0.22 * hover + 0.16 * on + 0.45 * flash) * dim,
-      glow: (0.3 * hover + 0.34 * on + 0.95 * flash) * dim,
+      alpha: Math.min(1, 0.62 + 0.24 * hover + 0.16 * on) * dim,
+      glow: (0.34 * hover + 0.34 * on) * dim,
       on,
     };
   }
@@ -410,8 +412,11 @@ export class GlassLayer {
     }
     if (!items.length) return null;
 
-    const W = Math.max(2, Math.round(host.width * k));
-    const H = Math.max(2, Math.round(host.height * k));
+    // Ueberabtastet zeichnen: die Lupe vergroessert das Zeichen, da soll
+    // keine Treppe sichtbar werden.
+    const ks = k * ICON_SS;
+    const W = Math.max(2, Math.round(host.width * ks));
+    const H = Math.max(2, Math.round(host.height * ks));
     const key =
       W + "x" + H + "|" +
       items
@@ -445,9 +450,9 @@ export class GlassLayer {
       const vb = (it.svg.getAttribute("viewBox") ?? "0 0 24 24").split(/[\s,]+/).map(Number);
       const [vx, vy, vw, vh] = vb.length === 4 ? vb : [0, 0, 24, 24];
       c.save();
-      c.translate((it.r.x - host.x + it.r.width / 2) * k, (it.r.y - host.y + it.r.height / 2) * k);
+      c.translate((it.r.x - host.x + it.r.width / 2) * ks, (it.r.y - host.y + it.r.height / 2) * ks);
       if (it.rot) c.rotate(it.rot);
-      c.scale((it.r.width * k) / vw, (it.r.height * k) / vh);
+      c.scale((it.r.width * ks) / vw, (it.r.height * ks) / vh);
       c.translate(-vx - vw / 2, -vy - vh / 2);
       c.lineWidth = parseFloat(it.svg.getAttribute("stroke-width") ?? "1.6");
       for (const child of Array.from(it.svg.children)) {
@@ -561,15 +566,19 @@ export class GlassLayer {
         gl.uniform1f(this.uni(this.pGlass, "uRadius"), rad * k);
         gl.uniform1f(this.uni(this.pGlass, "uDpr"), k);
         // Grobstufe, die ungefaehr der Flaeche des Elements entspricht:
-        // die unscharfe Fassung liegt in halber CSS-Aufloesung.
-        const span = Math.max(4, Math.min(b.width, b.height)) / 2;
+        // die unscharfe Fassung liegt in halber Geraeteaufloesung.
+        const span = (Math.max(4, Math.min(b.width, b.height)) * k) / 2;
         gl.uniform1f(
           this.uni(this.pGlass, "uLumLod"),
           Math.min(8, Math.max(1, Math.log2(span)))
         );
+        gl.uniform1f(this.uni(this.pGlass, "uIconLod"), Math.log2(ICON_SS));
+        gl.uniform1f(this.uni(this.pGlass, "uFill"), parseFloat(el.dataset.fill ?? "0") || 0);
         gl.uniform4f(this.uni(this.pGlass, "uTint"), tr, tg, tb, ta);
         gl.uniform1f(this.uni(this.pGlass, "uHasIcon"), ico ? 1 : 0);
-        gl.uniform1f(this.uni(this.pGlass, "uGlow"), Math.min(1.4, ico?.glow ?? 0));
+        // Auch Flaechen ohne Symbol reagieren auf die Maus.
+        const bare = el.matches(":hover") ? 0.34 : 0;
+        gl.uniform1f(this.uni(this.pGlass, "uGlow"), Math.min(1.4, ico?.glow ?? bare));
         const c = ico?.col ?? [1, 1, 1];
         gl.uniform3f(this.uni(this.pGlass, "uIconCol"), c[0], c[1], c[2]);
         this.quad(

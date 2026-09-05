@@ -296,9 +296,13 @@ eventBus.on("pagechanging", (e: { pageNumber: number }) => {
   }
 });
 
-eventBus.on("pagerendered", () => glass?.invalidate());
-eventBus.on("scalechanging", () => glass?.invalidate());
-container.addEventListener("scroll", () => glass?.invalidate(), { passive: true });
+eventBus.on("pagerendered", () => { glass?.invalidate(); paintProgress(); });
+eventBus.on("scalechanging", () => { glass?.invalidate(); paintProgress(); });
+container.addEventListener(
+  "scroll",
+  () => { glass?.invalidate(); paintProgress(); },
+  { passive: true }
+);
 window.addEventListener("resize", () => {
   window.clearTimeout(resizeTimer);
   resizeTimer = window.setTimeout(() => { fitOpen(); glass?.invalidate(); }, 160);
@@ -466,8 +470,6 @@ function setTool(next: string) {
   tool = next;
   if (next !== "none") armed = next;
   paintTool(next);
-  // Auch per Taste gewaehlt soll das Symbol kurz aufblitzen.
-  glass?.flash(toolBtn[next] ?? btnTool);
   if (!pdfViewer.pdfDocument) return;
   // "switchannotationeditormode" wird von PDF.js nur gesendet, nicht
   // empfangen - das Umschalten laeuft ueber diesen Setter.
@@ -608,6 +610,8 @@ const btnFind = $<HTMLButtonElement>("b-find");
 // egal wohin der Suchknopf geschoben wurde. Ihre Stelle steht im CSS.
 function openFind() {
   findbar.hidden = false;
+  // Ausgangsstelle laesst sich erst messen, wenn die Leiste steht.
+  refreshDrag();
   btnFind.classList.add("on");
   findInput.select();
   findInput.focus();
@@ -624,6 +628,63 @@ function closeFind() {
 btnFind.addEventListener("click", () => (findbar.hidden ? openFind() : closeFind()));
 $<HTMLButtonElement>("find-next").addEventListener("click", () => dispatchFind(true));
 $<HTMLButtonElement>("find-prev").addEventListener("click", () => dispatchFind(true, true));
+
+// ---------- Bildlaufleiste ----------
+
+const scroller = $<HTMLElement>("scroller");
+
+/** Fuellstand ist der Lesefortschritt. Licht daraus macht der Shader. */
+function paintProgress() {
+  const max = container.scrollHeight - container.clientHeight;
+  const p = max > 4 ? container.scrollTop / max : 0;
+  scroller.dataset.fill = String(Math.min(1, Math.max(0.004, p)));
+}
+
+/** Fuenf unsichtbare Felder von oben nach unten: schnell hoch, langsam
+ *  hoch, Ruhe, langsam runter, schnell runter. */
+const SPEED = [-1600, -300, 0, 300, 1600];
+let zone = 2;
+let autoId = 0;
+let lastTick = 0;
+
+function tick(t: number) {
+  const dt = lastTick ? Math.min(0.05, (t - lastTick) / 1000) : 0;
+  lastTick = t;
+  if (SPEED[zone]) container.scrollTop += SPEED[zone] * dt;
+  autoId = requestAnimationFrame(tick);
+}
+
+function stopAuto() {
+  if (autoId) cancelAnimationFrame(autoId);
+  autoId = 0;
+  zone = 2;
+}
+
+let wideTimer = 0;
+
+scroller.addEventListener("pointerenter", () => {
+  window.clearTimeout(wideTimer);
+  // Erst nach einer Sekunde Verweilen - sonst schnappt der Stab zu, wenn
+  // die Maus nur vorbeizieht.
+  wideTimer = window.setTimeout(() => {
+    scroller.classList.add("wide");
+    lastTick = 0;
+    if (!autoId) autoId = requestAnimationFrame(tick);
+  }, 1000);
+});
+
+scroller.addEventListener("pointerleave", () => {
+  window.clearTimeout(wideTimer);
+  scroller.classList.remove("wide");
+  stopAuto();
+});
+
+scroller.addEventListener("pointermove", (e) => {
+  if (!scroller.classList.contains("wide")) return;
+  const r = scroller.getBoundingClientRect();
+  const t = (e.clientY - r.y) / Math.max(1, r.height);
+  zone = Math.min(4, Math.max(0, Math.floor(t * 5)));
+});
 
 // ---------- Tastatur ----------
 
@@ -766,6 +827,7 @@ function makeDraggable(el: HTMLElement, key: string) {
 makeDraggable($<HTMLElement>("b-find"), "find");
 makeDraggable($<HTMLElement>("b-invert"), "invert");
 makeDraggable($<HTMLElement>("anngroup"), "ann");
+makeDraggable(findbar, "findbar");
 
 /** Nach dem Sichtbarwerden des Lesers Ausgangsstellen neu vermessen. */
 function refreshDrag() {

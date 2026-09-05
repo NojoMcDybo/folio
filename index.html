@@ -24,6 +24,10 @@
       <button id="b-find" class="ico glass solo drag" title="Suchen · Strg+F"></button>
       <button id="b-invert" class="ico glass solo drag" title="Invertieren · Strg+I"></button>
 
+      <!-- Einzige Bildlaufleiste: fuellt sich mit dem Lesefortschritt,
+           nach einer Sekunde Verweilen wird sie zum Scrollfeld. -->
+      <div id="scroller" class="glass"></div>
+
       <div id="pagechip" class="glass"></div>
       <button id="b-save" class="ico glass solo" title="Sichern · Strg+S" hidden></button>
 
@@ -37,7 +41,7 @@
         <label id="swatch" class="glass solo side" title="Farbe"><input id="color" type="color" value="#ffd23f" /></label>
       </div>
 
-      <div id="findbar" class="glass row" hidden>
+      <div id="findbar" class="glass row drag" hidden>
         <input id="find-q" type="text" spellcheck="false" autocomplete="off" />
         <span id="find-count"></span>
         <button id="find-prev" class="ico sm" title="Zurück"></button>

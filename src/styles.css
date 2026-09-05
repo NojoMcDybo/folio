@@ -97,7 +97,7 @@ body.no-gl .glass {
 
 /* Die Symbole auf Glas zeichnet der Shader - sie liegen im Glas, nicht
    darauf. Das DOM behaelt sie nur als Vorlage und fuer die Groesse.
-   Hover, Ein-Zustand und Klickblitz macht dort das Leuchten. */
+   Hover und Ein-Zustand macht dort das Leuchten. */
 body:not(.no-gl) .glass svg { opacity: 0; }
 
 body.no-gl .ico:hover { color: #fff; background: rgba(255, 255, 255, 0.14); }
@@ -107,7 +107,7 @@ body.no-gl .ico.danger:hover { background: #d13b3b; color: #fff; }
 /* .ico setzt position:relative und wuerde das fixed der Glasklasse
    ueberschreiben - hier ausdruecklich zurueckholen. */
 #b-home, #b-find, #b-invert, #b-save,
-#wincontrols, #pagechip, #anngroup, #findbar, #toast { position: fixed; }
+#wincontrols, #pagechip, #anngroup, #findbar, #toast, #scroller { position: fixed; }
 
 /* Kinder einer Gruppe bleiben im Fluss, sonst bricht die Reihe. */
 #anngroup > *, #wincontrols > *, #findbar > * { position: relative; }
@@ -134,6 +134,31 @@ body.no-gl .ico.danger:hover { background: #d13b3b; color: #fff; }
 }
 #pagechip.show { opacity: 1; }
 #b-save { bottom: 22px; right: 22px; }
+
+/* Die Bildlaufleiste: ein schmaler Stab an der Seite. Nach einer Sekunde
+   unter der Maus wird er breiter und dient dann als Scrollfeld - oben
+   schnell hoch, unten schnell runter, in der Mitte Ruhe. */
+#scroller {
+  top: 50%;
+  right: 13px;
+  translate: 0 -50%;
+  width: 9px;
+  height: 46vh;
+  min-height: 170px;
+  border-radius: 999px;
+  transition:
+    width 0.36s var(--spring),
+    height 0.36s var(--spring),
+    right 0.36s var(--spring),
+    opacity 0.34s var(--ease);
+}
+
+#scroller.wide {
+  width: 30px;
+  height: 66vh;
+  right: 16px;
+}
+
 #anngroup {
   bottom: 22px;
   left: 50%;
@@ -367,20 +392,11 @@ body.dragging .drop .cover svg { stroke: var(--accent); transform: scale(1.25); 
 .textLayer .highlight { background: rgba(155, 140, 255, 0.38); border-radius: 2px; }
 .textLayer .highlight.selected { background: rgba(155, 140, 255, 0.7); }
 
-#container .editToolbar {
-  --editor-toolbar-bg-color: rgba(26, 26, 30, 0.9);
-  --editor-toolbar-fg-color: #f2f2f4;
-  --editor-toolbar-border-color: rgba(255, 255, 255, 0.16);
-  --editor-toolbar-hover-border-color: rgba(255, 255, 255, 0.28);
-  --editor-toolbar-hover-bg-color: rgba(255, 255, 255, 0.13);
-  --editor-toolbar-hover-fg-color: #fff;
-  --editor-toolbar-focus-outline-color: var(--accent);
-  --editor-toolbar-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-  --editor-toolbar-height: 30px;
-  --editor-toolbar-padding: 4px;
-  border-radius: 13px;
-  backdrop-filter: blur(18px) saturate(180%);
-}
+/* PDF.js haengt an jede ausgewaehlte Anmerkung eine eigene kleine Leiste.
+   Sie bringt nur Loeschen und eine Farbliste mit, bricht in unserem
+   dunklen Thema auseinander und passt nicht zur uebrigen Oberflaeche.
+   Weg damit - Entf loescht die ausgewaehlte Anmerkung. */
+#container .editToolbar { display: none !important; }
 
 #container .annotationEditorLayer {
   --outline-color: var(--accent);
