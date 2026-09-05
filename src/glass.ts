@@ -347,11 +347,11 @@ export class GlassLayer {
     // von Natur aus glatte Vektorform - ohne Supersampling sieht man auf
     // einem Bildschirm ohne HiDPI-Skalierung (devicePixelRatio 1) die
     // einzelnen Pixel am Rand. Deshalb zeichnen wir die Knopf-Ebene immer
-    // mindestens doppelt so fein wie der Bildschirm und lassen den
+    // mindestens vierfach so fein wie der Bildschirm und lassen den
     // Browser beim Verkleinern auf die echte Groesse glaetten - das ist
     // der Trick, mit dem Retina-Displays das automatisch "geschenkt"
     // bekommen und alle anderen eben nicht.
-    const renderK = Math.max(dpr, 2);
+    const renderK = Math.max(dpr, 4);
     this.renderK = renderK;
     this.w = window.innerWidth;
     this.h = window.innerHeight;
