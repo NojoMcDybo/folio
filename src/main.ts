@@ -652,12 +652,12 @@ function paintProgress() {
 
 /** Fuenf unsichtbare Felder von oben nach unten: schnell hoch, langsam
  *  hoch (Lesetempo), Ruhe, langsam runter (Lesetempo), schnell runter
- *  (Ueberfliegen). Nur per Hover erreichbar - der Griff ist Anzeige und
- *  Hover-Ziel, kein Scrubber zum Ziehen. */
+ *  (Ueberfliegen). Nur per Hover erreichbar. */
 const SPEED = [-1600, -300, 0, 300, 1600];
 let zone = 2;
 let autoId = 0;
 let lastTick = 0;
+let dragging = false;
 
 function tick(t: number) {
   const dt = lastTick ? Math.min(0.05, (t - lastTick) / 1000) : 0;
@@ -690,17 +690,56 @@ scroller.addEventListener("pointerenter", () => {
 });
 
 scroller.addEventListener("pointerleave", () => {
+  if (dragging) return;
   window.clearTimeout(wideTimer);
   scroller.classList.remove("wide");
   stopAuto();
 });
 
 scroller.addEventListener("pointermove", (e) => {
-  if (!scroller.classList.contains("wide")) return;
+  if (!scroller.classList.contains("wide") || dragging) return;
   const r = scroller.getBoundingClientRect();
   const t = (e.clientY - r.y) / Math.max(1, r.height);
   zone = Math.min(4, Math.max(0, Math.floor(t * 5)));
 });
+
+// Deckt sich mit dem Rand in styles.css (#scroller top: calc(...)).
+const TRACK_MARGIN = 64;
+
+/** Ziehen setzt die Leseposition direkt, wie bei einer echten
+ *  Bildlaufleiste: die Stelle im Fenster ist die Stelle im Dokument. */
+function scrubTo(e: PointerEvent) {
+  const usable = Math.max(1, window.innerHeight - TRACK_MARGIN * 2);
+  const t = Math.min(1, Math.max(0, (e.clientY - TRACK_MARGIN) / usable));
+  const max = container.scrollHeight - container.clientHeight;
+  container.scrollTop = t * max;
+}
+
+scroller.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  dragging = true;
+  window.clearTimeout(wideTimer);
+  scroller.classList.remove("wide");
+  stopAuto();
+  scroller.classList.add("dragging");
+  scroller.setPointerCapture(e.pointerId);
+  scrubTo(e);
+});
+
+window.addEventListener("pointermove", (e) => {
+  if (dragging) scrubTo(e);
+});
+
+function endDrag(e: PointerEvent) {
+  if (!dragging) return;
+  dragging = false;
+  scroller.classList.remove("dragging");
+  try { scroller.releasePointerCapture(e.pointerId); } catch { /* schon los */ }
+}
+
+window.addEventListener("pointerup", endDrag);
+window.addEventListener("pointercancel", endDrag);
 
 // ---------- Tastatur ----------
 
