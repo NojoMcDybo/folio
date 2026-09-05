@@ -139,19 +139,19 @@ body.no-gl .ico.danger:hover { background: #d13b3b; color: #fff; }
    unter der Maus wird er breiter und dient dann als Scrollfeld - oben
    schnell hoch, unten schnell runter, in der Mitte Ruhe. */
 #scroller {
-  top: 50%;
+  --scroller-p: 0.5;
+  /* Kein fester Punkt in der Bildschirmmitte - der Griff wandert wie bei
+     einer normalen Bildlaufleiste mit dem Lesefortschritt zwischen den
+     Randabstaenden oben und unten. Erst beim Hovern (s. main.ts) schnappt
+     er fuer die vollen fuenf Geschwindigkeitsfelder in die Mitte. */
+  top: calc(64px + var(--scroller-p) * (100% - 128px));
   right: 13px;
   translate: 0 -50%;
-  width: 9px;
-  /* Ruhezustand bleibt ein nebensaechliches Detail, kein eigener Balken -
-     aber etwas laenger als ein reiner Knopf, damit er sich als Ziehgriff
-     greifen laesst. Waechst beim Hovern oder Ziehen zum vollen Scrollfeld. */
-  height: 9vh;
-  min-height: 46px;
-  max-height: 70px;
+  width: 5px;
+  height: 56px;
   border-radius: 999px;
-  cursor: pointer;
   transition:
+    top 0.5s var(--ease),
     width 0.36s var(--spring),
     height 0.36s var(--spring),
     right 0.36s var(--spring),
@@ -159,14 +159,13 @@ body.no-gl .ico.danger:hover { background: #d13b3b; color: #fff; }
 }
 
 #scroller.wide {
-  width: 30px;
-  /* Etwas hoeher als frueher - fuenf Geschwindigkeitsfelder brauchen mehr
-     Platz je Feld, sonst treffen die langsamen Stufen kaum zu treffen. */
+  top: 50%;
+  width: 28px;
+  /* Fuenf Geschwindigkeitsfelder brauchen Platz je Feld, sonst sind die
+     langsamen Stufen kaum zu treffen. */
   height: 74vh;
   right: 16px;
 }
-
-#scroller.dragging { cursor: grabbing; }
 
 #anngroup {
   bottom: 22px;

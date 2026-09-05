@@ -638,27 +638,31 @@ $<HTMLButtonElement>("find-prev").addEventListener("click", () => dispatchFind(t
 
 const scroller = $<HTMLElement>("scroller");
 
-/** Fuellstand ist der Lesefortschritt. Licht daraus macht der Shader. */
+/** Fuellstand ist der Lesefortschritt, das macht der Shader zu Licht.
+ *  Zusaetzlich wandert der Griff selbst am rechten Rand entlang wie bei
+ *  einer normalen Bildlaufleiste, statt fest in der Bildschirmmitte zu
+ *  kleben - die Ruheposition ist also nicht feststehend, sondern haengt
+ *  direkt vom Scrollfortschritt ab. */
 function paintProgress() {
   const max = container.scrollHeight - container.clientHeight;
   const p = max > 4 ? container.scrollTop / max : 0;
   scroller.dataset.fill = String(Math.min(1, Math.max(0.004, p)));
+  scroller.style.setProperty("--scroller-p", String(Math.min(1, Math.max(0, p))));
 }
 
 /** Fuenf unsichtbare Felder von oben nach unten: schnell hoch, langsam
- *  hoch, Ruhe, langsam runter, schnell runter. */
+ *  hoch (Lesetempo), Ruhe, langsam runter (Lesetempo), schnell runter
+ *  (Ueberfliegen). Nur per Hover erreichbar - der Griff ist Anzeige und
+ *  Hover-Ziel, kein Scrubber zum Ziehen. */
 const SPEED = [-1600, -300, 0, 300, 1600];
 let zone = 2;
 let autoId = 0;
 let lastTick = 0;
-let dragging = false;
 
 function tick(t: number) {
   const dt = lastTick ? Math.min(0.05, (t - lastTick) / 1000) : 0;
   lastTick = t;
-  // Waehrend des Ziehens bestimmt scrubTo() die Position direkt - die
-  // Geschwindigkeitsfelder wuerden sonst dagegenarbeiten.
-  if (!dragging && SPEED[zone]) container.scrollTop += SPEED[zone] * dt;
+  if (SPEED[zone]) container.scrollTop += SPEED[zone] * dt;
   autoId = requestAnimationFrame(tick);
 }
 
@@ -686,52 +690,17 @@ scroller.addEventListener("pointerenter", () => {
 });
 
 scroller.addEventListener("pointerleave", () => {
-  if (dragging) return; // beim Ziehen bleibt er breit, auch wenn die Maus knapp rausrutscht
   window.clearTimeout(wideTimer);
   scroller.classList.remove("wide");
   stopAuto();
 });
 
 scroller.addEventListener("pointermove", (e) => {
-  if (!scroller.classList.contains("wide") || dragging) return;
+  if (!scroller.classList.contains("wide")) return;
   const r = scroller.getBoundingClientRect();
   const t = (e.clientY - r.y) / Math.max(1, r.height);
   zone = Math.min(4, Math.max(0, Math.floor(t * 5)));
 });
-
-/** Ziehen setzt die Leseposition direkt: die Stelle im Stab ist die Stelle
- *  im Dokument, wie bei einem Scrubber - unabhaengig von den Feldern oben. */
-function scrubTo(e: PointerEvent) {
-  const r = scroller.getBoundingClientRect();
-  const t = Math.min(1, Math.max(0, (e.clientY - r.y) / Math.max(1, r.height)));
-  const max = container.scrollHeight - container.clientHeight;
-  container.scrollTop = t * max;
-}
-
-scroller.addEventListener("pointerdown", (e) => {
-  if (e.button !== 0) return;
-  e.preventDefault();
-  dragging = true;
-  window.clearTimeout(wideTimer);
-  scroller.classList.add("wide", "dragging");
-  scroller.setPointerCapture(e.pointerId);
-  scrubTo(e);
-});
-
-window.addEventListener("pointermove", (e) => {
-  if (dragging) scrubTo(e);
-});
-
-function endDrag(e: PointerEvent) {
-  if (!dragging) return;
-  dragging = false;
-  scroller.classList.remove("dragging");
-  try { scroller.releasePointerCapture(e.pointerId); } catch { /* schon los */ }
-  startAuto();
-}
-
-window.addEventListener("pointerup", endDrag);
-window.addEventListener("pointercancel", endDrag);
 
 // ---------- Tastatur ----------
 
