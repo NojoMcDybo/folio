@@ -282,7 +282,7 @@ export class GlassLayer {
   private b!: ReturnType<typeof makeTarget>;
   private w = 0;
   private h = 0;
-  private dpr = 1;
+  private renderK = 1;
   private dirty = true;
   private painter: Painter = () => {};
   private icons = new WeakMap<Element, { tex: WebGLTexture; key: string; cv: HTMLCanvasElement }>();
@@ -343,11 +343,20 @@ export class GlassLayer {
 
   private resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.dpr = dpr;
+    // Die Kanten sind eine im Shader gerechnete Distanzfunktion, keine
+    // von Natur aus glatte Vektorform - ohne Supersampling sieht man auf
+    // einem Bildschirm ohne HiDPI-Skalierung (devicePixelRatio 1) die
+    // einzelnen Pixel am Rand. Deshalb zeichnen wir die Knopf-Ebene immer
+    // mindestens doppelt so fein wie der Bildschirm und lassen den
+    // Browser beim Verkleinern auf die echte Groesse glaetten - das ist
+    // der Trick, mit dem Retina-Displays das automatisch "geschenkt"
+    // bekommen und alle anderen eben nicht.
+    const renderK = Math.max(dpr, 2);
+    this.renderK = renderK;
     this.w = window.innerWidth;
     this.h = window.innerHeight;
-    this.canvas.width = Math.round(this.w * dpr);
-    this.canvas.height = Math.round(this.h * dpr);
+    this.canvas.width = Math.round(this.w * renderK);
+    this.canvas.height = Math.round(this.h * renderK);
     this.canvas.style.width = this.w + "px";
     this.canvas.style.height = this.h + "px";
 
@@ -546,7 +555,7 @@ export class GlassLayer {
       gl.uniform1i(this.uni(this.pGlass, "uBlur"), 1);
       gl.uniform1i(this.uni(this.pGlass, "uIcon"), 2);
 
-      const k = this.dpr;
+      const k = this.renderK;
       for (const el of els) {
         const b = el.getBoundingClientRect();
         const cs = getComputedStyle(el);
