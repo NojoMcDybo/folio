@@ -167,11 +167,12 @@ void main() {
     float f = 1.0 - smoothstep(uFill - 0.006, uFill + 0.006, ly);
     float front = exp(-pow((ly - uFill) / 0.035, 2.0));
     vec3 lightCol = vec3(1.0, 1.0, 1.0);
-    // Der leere Teil glimmt schwach, sonst waere der Stab ueber dem
-    // schwarzen Rand gar nicht zu finden.
-    col += lightCol * (0.05 + 0.05 * g) * (0.4 + 0.6 * dome);
-    col += lightCol * f * (0.20 + 0.34 * dome) * (0.85 + 0.5 * g);
-    col += lightCol * front * (0.22 + 0.3 * g);
+    // Grundschimmer ueber den ganzen Knopf, nicht nur ueber dem gefuellten
+    // Teil - waechst mit dem Fortschritt, damit der ganze Koerper sichtbar
+    // mehr Licht traegt und deutlicher spiegelt, nicht nur ein schmaler Rand.
+    col += lightCol * (0.10 + 0.10 * g + 0.24 * uFill) * (0.5 + 0.9 * dome);
+    col += lightCol * f * (0.34 + 0.5 * dome) * (0.9 + 0.5 * g);
+    col += lightCol * front * (0.30 + 0.35 * g);
   }
 
   float a = 1.0 - smoothstep(-1.0, 0.5, d);

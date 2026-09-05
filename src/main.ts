@@ -645,24 +645,32 @@ function paintProgress() {
   scroller.dataset.fill = String(Math.min(1, Math.max(0.004, p)));
 }
 
-/** Drei unsichtbare Felder von oben nach unten: schnell hoch, Ruhe,
- *  schnell runter - die langsamen Zwischenstufen sind raus. */
-const SPEED = [-1600, 0, 1600];
-let zone = 1;
+/** Fuenf unsichtbare Felder von oben nach unten: schnell hoch, langsam
+ *  hoch, Ruhe, langsam runter, schnell runter. */
+const SPEED = [-1600, -300, 0, 300, 1600];
+let zone = 2;
 let autoId = 0;
 let lastTick = 0;
+let dragging = false;
 
 function tick(t: number) {
   const dt = lastTick ? Math.min(0.05, (t - lastTick) / 1000) : 0;
   lastTick = t;
-  if (SPEED[zone]) container.scrollTop += SPEED[zone] * dt;
+  // Waehrend des Ziehens bestimmt scrubTo() die Position direkt - die
+  // Geschwindigkeitsfelder wuerden sonst dagegenarbeiten.
+  if (!dragging && SPEED[zone]) container.scrollTop += SPEED[zone] * dt;
   autoId = requestAnimationFrame(tick);
+}
+
+function startAuto() {
+  lastTick = 0;
+  if (!autoId) autoId = requestAnimationFrame(tick);
 }
 
 function stopAuto() {
   if (autoId) cancelAnimationFrame(autoId);
   autoId = 0;
-  zone = 1;
+  zone = 2;
 }
 
 let wideTimer = 0;
@@ -673,23 +681,57 @@ scroller.addEventListener("pointerenter", () => {
   // die Maus nur vorbeizieht.
   wideTimer = window.setTimeout(() => {
     scroller.classList.add("wide");
-    lastTick = 0;
-    if (!autoId) autoId = requestAnimationFrame(tick);
+    startAuto();
   }, 1000);
 });
 
 scroller.addEventListener("pointerleave", () => {
+  if (dragging) return; // beim Ziehen bleibt er breit, auch wenn die Maus knapp rausrutscht
   window.clearTimeout(wideTimer);
   scroller.classList.remove("wide");
   stopAuto();
 });
 
 scroller.addEventListener("pointermove", (e) => {
-  if (!scroller.classList.contains("wide")) return;
+  if (!scroller.classList.contains("wide") || dragging) return;
   const r = scroller.getBoundingClientRect();
   const t = (e.clientY - r.y) / Math.max(1, r.height);
-  zone = Math.min(2, Math.max(0, Math.floor(t * 3)));
+  zone = Math.min(4, Math.max(0, Math.floor(t * 5)));
 });
+
+/** Ziehen setzt die Leseposition direkt: die Stelle im Stab ist die Stelle
+ *  im Dokument, wie bei einem Scrubber - unabhaengig von den Feldern oben. */
+function scrubTo(e: PointerEvent) {
+  const r = scroller.getBoundingClientRect();
+  const t = Math.min(1, Math.max(0, (e.clientY - r.y) / Math.max(1, r.height)));
+  const max = container.scrollHeight - container.clientHeight;
+  container.scrollTop = t * max;
+}
+
+scroller.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  dragging = true;
+  window.clearTimeout(wideTimer);
+  scroller.classList.add("wide", "dragging");
+  scroller.setPointerCapture(e.pointerId);
+  scrubTo(e);
+});
+
+window.addEventListener("pointermove", (e) => {
+  if (dragging) scrubTo(e);
+});
+
+function endDrag(e: PointerEvent) {
+  if (!dragging) return;
+  dragging = false;
+  scroller.classList.remove("dragging");
+  try { scroller.releasePointerCapture(e.pointerId); } catch { /* schon los */ }
+  startAuto();
+}
+
+window.addEventListener("pointerup", endDrag);
+window.addEventListener("pointercancel", endDrag);
 
 // ---------- Tastatur ----------
 
