@@ -466,6 +466,8 @@ function setTool(next: string) {
   tool = next;
   if (next !== "none") armed = next;
   paintTool(next);
+  // Auch per Taste gewaehlt soll das Symbol kurz aufblitzen.
+  glass?.flash(toolBtn[next] ?? btnTool);
   if (!pdfViewer.pdfDocument) return;
   // "switchannotationeditormode" wird von PDF.js nur gesendet, nicht
   // empfangen - das Umschalten laeuft ueber diesen Setter.
@@ -602,20 +604,10 @@ findInput.addEventListener("keydown", (e) => {
 
 const btnFind = $<HTMLButtonElement>("b-find");
 
-/** Das Suchfeld haengt am Suchknopf - zieht man den weg, folgt es. */
-function placeFindbar() {
-  if (findbar.hidden) return;
-  const b = btnFind.getBoundingClientRect();
-  const w = findbar.offsetWidth || 320;
-  const x = Math.min(Math.max(b.left + b.width / 2 - w / 2, 12), window.innerWidth - w - 12);
-  findbar.style.left = Math.round(x) + "px";
-  findbar.style.top = Math.round(b.bottom + 10) + "px";
-  findbar.style.translate = "0 0";
-}
-
+// Die Suchleiste steht fuer sich: sie taucht immer oben in der Mitte auf,
+// egal wohin der Suchknopf geschoben wurde. Ihre Stelle steht im CSS.
 function openFind() {
   findbar.hidden = false;
-  placeFindbar();
   btnFind.classList.add("on");
   findInput.select();
   findInput.focus();
@@ -691,7 +683,6 @@ function makeDraggable(el: HTMLElement, key: string) {
     el.style.right = "auto";
     el.style.bottom = "auto";
     el.style.translate = "0 0";
-    placeFindbar();
   };
 
   /** Ausgangsstelle messen: dafuer die eigenen Angaben kurz abraeumen,

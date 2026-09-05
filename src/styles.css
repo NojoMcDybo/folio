@@ -92,23 +92,17 @@ body.no-gl .glass {
 .ico svg { width: 18px; height: 18px; pointer-events: none; }
 .ico.sm svg { width: 14px; height: 14px; }
 
-.ico:hover { color: #fff; background: rgba(255, 255, 255, 0.14); }
 .ico:active { transform: scale(0.86); transition-duration: 0.08s; }
 .ico:disabled { opacity: 0.3; pointer-events: none; }
-.ico.danger:hover { background: #d13b3b; color: #fff; }
 
-.ico.on { color: #fff; background: rgba(155, 140, 255, 0.34); }
-.ico.on::after {
-  content: "";
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(155, 140, 255, 0.45), transparent 70%);
-  z-index: -1;
-  animation: glow 0.4s var(--ease);
-}
+/* Die Symbole auf Glas zeichnet der Shader - sie liegen im Glas, nicht
+   darauf. Das DOM behaelt sie nur als Vorlage und fuer die Groesse.
+   Hover, Ein-Zustand und Klickblitz macht dort das Leuchten. */
+body:not(.no-gl) .glass svg { opacity: 0; }
 
-@keyframes glow { from { opacity: 0; transform: scale(0.5); } }
+body.no-gl .ico:hover { color: #fff; background: rgba(255, 255, 255, 0.14); }
+body.no-gl .ico.on { color: #fff; background: rgba(155, 140, 255, 0.34); }
+body.no-gl .ico.danger:hover { background: #d13b3b; color: #fff; }
 
 /* .ico setzt position:relative und wuerde das fixed der Glasklasse
    ueberschreiben - hier ausdruecklich zurueckholen. */
@@ -151,7 +145,15 @@ body.no-gl .glass {
      Symbole - die Gruppe selbst traegt keine .glass-Klasse. */
   z-index: 40;
 }
-#findbar { top: 62px; left: 50%; translate: -50% 0; padding: 5px 5px 5px 14px; }
+/* Die Suchleiste steht fuer sich, oben in der Mitte - sie haengt nicht
+   am Suchknopf, auch wenn der weggeschoben wurde. */
+#findbar {
+  top: 62px;
+  left: 50%;
+  translate: -50% 0;
+  padding: 5px 5px 5px 14px;
+  animation: dropin 0.34s var(--spring);
+}
 
 /* Die Werkzeuge fahren symmetrisch nach links und rechts aus. Weil je
    zwei auf jeder Seite liegen, bleibt der Hauptknopf exakt stehen - der

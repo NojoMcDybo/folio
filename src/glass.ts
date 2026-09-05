@@ -7,17 +7,25 @@
  * Shader brechen, statt wie die ueblichen Web-Bibliotheken das DOM
  * abzufotografieren.
  *
+ * Die Knoepfe sind keine flachen Scheiben mit abgeschraegter Kante, sondern
+ * Kuppeln: die Dicke waechst von der Kante bis zur Mitte, die Brechung
+ * laeuft ueber die ganze Flaeche. Die Symbole liegen nicht darauf, sondern
+ * darin - sie werden in eine Textur gezeichnet, mit der Kuppel verzerrt und
+ * leuchten von innen. Beim Ueberfahren heller, beim Klick ein kurzer Blitz.
+ *
  * Je Bild:
  *   1. Hintergrund in ein 2D-Canvas malen (nur wenn er sich geaendert hat)
  *   2. daraus eine unscharfe Fassung in halber Aufloesung rechnen
- *   3. fuer jedes .glass-Element ein Rechteck zeichnen: Mitte unscharf,
- *      Rand gebrochen, mit Farbsaum, Glanzkante und Schattenkante
+ *   3. je .glass-Element ein Rechteck: Kuppel, Brechung, Toenung, Symbol
  */
 
 export type Painter = (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
 
 /** Aufloesung des Hintergrundabzugs, 1 = volle Fenstergroesse. */
 const SCALE = 1;
+
+/** Dauer des Aufblitzens beim Klick in Millisekunden. */
+const FLASH = 300;
 
 const VS = `#version 300 es
 in vec2 aPos;
@@ -51,14 +59,17 @@ void main() {
 const FS_GLASS = `#version 300 es
 precision highp float;
 
-uniform vec2 uRes;      // Fenstergroesse in CSS-Pixeln
+uniform vec2 uRes;      // Fenstergroesse in Geraetepixeln
 uniform vec4 uRect;     // x, y, w, h
 uniform float uRadius;
 uniform vec4 uTint;
-uniform float uPress;   // 0 = ruhig, 1 = gedrueckt
 uniform float uDpr;     // Geraetepixel je CSS-Pixel
+uniform float uGlow;    // 0 = ruhig, 1 = angefasst, darueber Blitz
+uniform float uHasIcon;
+uniform vec3 uIconCol;
 uniform sampler2D uBack;
 uniform sampler2D uBlur;
+uniform sampler2D uIcon;
 out vec4 outColor;
 
 float sdBox(vec2 p, vec2 b, float r) {
@@ -81,31 +92,56 @@ void main() {
   vec2 n = normalize(vec2(
     sdBox(p + e.xy, hs, r) - sdBox(p - e.xy, hs, r),
     sdBox(p + e.yx, hs, r) - sdBox(p - e.yx, hs, r)
-  ));
+  ) + 1e-6);
 
-  // Dickenprofil: am Rand voll, nach innen abfallend - das ist die Fase,
-  // die die Brechung erzeugt.
-  float bevel = clamp(min(hs.x, hs.y) * 0.9, 9.0 * uDpr, 26.0 * uDpr);
-  float t = 1.0 - smoothstep(0.0, bevel, -d);
-  float t2 = t * t;
+  // Kuppel: u laeuft von 0 an der Kante bis 1 im Kern. Die Hoehe folgt
+  // einem Kreisquerschnitt, die Neigung faellt weich bis zur Mitte ab -
+  // dadurch bricht die ganze Flaeche und nicht nur der Rand.
+  float R = min(hs.x, hs.y);
+  float u = clamp(-d / R, 0.0, 1.0);
+  float dome = sqrt(max(0.0, 1.0 - (1.0 - u) * (1.0 - u)));
+  float slope = pow(1.0 - u, 1.35);
 
-  // Brechung: am Rand wird der Hintergrund nach aussen abgetastet.
-  float amp = (22.0 + 10.0 * uPress) * uDpr;
-  vec2 off = n * t2 * amp / uRes;
+  // Nach innen abtasten: die Kuppel wirkt wie eine Lupe.
+  float amp = clamp(R * 0.42, 7.0 * uDpr, 30.0 * uDpr);
+  vec2 off = -n * slope * amp / uRes;
 
   vec2 uv = frag / uRes;
   vec3 refr;
-  refr.r = texture(uBack, uv + off * 1.10).r;
-  refr.g = texture(uBack, uv + off * 1.00).g;
-  refr.b = texture(uBack, uv + off * 0.90).b;
+  refr.r = texture(uBack, uv + off * 1.06).r;
+  refr.g = texture(uBack, uv + off).g;
+  refr.b = texture(uBack, uv + off * 0.94).b;
 
-  // Koerper: unscharfe Fassung, ohne Versatz
-  vec3 body = texture(uBlur, vec2(uv.x, 1.0 - uv.y)).rgb;
+  // Koerper: unscharfe Fassung, wandert leicht mit
+  vec2 buv = uv + off * 0.45;
+  vec3 body = texture(uBlur, vec2(buv.x, 1.0 - buv.y)).rgb;
 
-  // Nur Brechung und Toenung. Keine helle Kante, kein Glanzlicht -
-  // das Glas zeigt ausschliesslich, was dahinter liegt.
-  vec3 col = mix(body, refr, t2);
+  // Keine helle Kante, kein Glanzlicht - nur Brechung und Toenung.
+  float mixw = clamp(0.30 + 0.75 * slope, 0.0, 1.0);
+  vec3 col = mix(body, refr, mixw);
   col = mix(col, uTint.rgb, uTint.a);
+
+  if (uHasIcon > 0.5) {
+    // Das Symbol liegt unter der Kuppel und wird mitverzerrt, aber
+    // schwaecher - es sitzt ja nicht ganz unten.
+    vec2 iuv = (frag - uRect.xy) / uRect.zw;
+    vec2 ioff = off * uRes / uRect.zw * 0.55;
+    float core = texture(uIcon, iuv + ioff).a;
+
+    // Zwei Ringe als billiger Lichthof
+    float halo = 0.0;
+    for (int i = 0; i < 6; i++) {
+      float a = 1.0471976 * float(i);
+      vec2 dir = vec2(cos(a), sin(a));
+      halo += texture(uIcon, iuv + ioff + dir * (3.5 * uDpr) / uRect.zw).a;
+      halo += texture(uIcon, iuv + ioff + dir * (10.0 * uDpr) / uRect.zw).a * 0.55;
+    }
+    halo /= 9.3;
+
+    float lightCore = core * (0.92 + 0.75 * uGlow);
+    float lightHalo = halo * (0.14 + 0.60 * uGlow) * (0.35 + 0.65 * dome);
+    col += uIconCol * (lightCore + lightHalo);
+  }
 
   float a = 1.0 - smoothstep(-1.0, 0.5, d);
   outColor = vec4(col, a);
@@ -147,6 +183,55 @@ function makeTarget(gl: WebGL2RenderingContext, w: number, h: number) {
   return { tex, fbo, w, h };
 }
 
+// ---------- Symbole in eine Textur zeichnen ----------
+
+const num = (el: Element, name: string, fallback = 0) => {
+  const v = el.getAttribute(name);
+  return v === null ? fallback : parseFloat(v);
+};
+
+/** Ein SVG-Kind als Pfad. Unsere Symbole bestehen nur aus path, circle
+ *  und rect - mehr muss der Zeichner nicht koennen. */
+function pathOf(el: Element): Path2D | null {
+  switch (el.tagName.toLowerCase()) {
+    case "path": {
+      const d = el.getAttribute("d");
+      return d ? new Path2D(d) : null;
+    }
+    case "circle": {
+      const p = new Path2D();
+      p.arc(num(el, "cx"), num(el, "cy"), num(el, "r"), 0, Math.PI * 2);
+      return p;
+    }
+    case "rect": {
+      const p = new Path2D();
+      p.roundRect(num(el, "x"), num(el, "y"), num(el, "width"), num(el, "height"), num(el, "rx"));
+      return p;
+    }
+    case "line": {
+      const p = new Path2D();
+      p.moveTo(num(el, "x1"), num(el, "y1"));
+      p.lineTo(num(el, "x2"), num(el, "y2"));
+      return p;
+    }
+    default:
+      return null;
+  }
+}
+
+/** Drehwinkel aus dem berechneten Stil - so bleiben CSS-Animationen
+ *  (etwa der kippende Halbmond) auch im Glas erhalten. */
+function rotOf(cs: CSSStyleDeclaration) {
+  const t = cs.transform;
+  if (!t || t === "none") return 0;
+  const m = /matrix\(([^)]+)\)/.exec(t);
+  if (!m) return 0;
+  const v = m[1].split(",").map(Number);
+  return Math.atan2(v[1], v[0]);
+}
+
+type IconItem = { svg: SVGSVGElement; r: DOMRect; rot: number; alpha: number };
+
 export class GlassLayer {
   private gl: WebGL2RenderingContext;
   private pBlur: WebGLProgram;
@@ -154,14 +239,16 @@ export class GlassLayer {
   private back = document.createElement("canvas");
   private bctx: CanvasRenderingContext2D;
   private backTex: WebGLTexture;
+  private blank: WebGLTexture;
   private a!: ReturnType<typeof makeTarget>;
   private b!: ReturnType<typeof makeTarget>;
   private w = 0;
   private h = 0;
   private dpr = 1;
   private dirty = true;
-  private press = new WeakMap<Element, number>();
   private painter: Painter = () => {};
+  private icons = new WeakMap<Element, { tex: WebGLTexture; key: string; cv: HTMLCanvasElement }>();
+  private flashAt = new WeakMap<Element, number>();
 
   constructor(private canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", {
@@ -189,8 +276,24 @@ export class GlassLayer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
+    // Platzhalter fuer Flaechen ohne Symbol
+    this.blank = gl.createTexture() as WebGLTexture;
+    gl.bindTexture(gl.TEXTURE_2D, this.blank);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
     gl.enable(gl.BLEND);
     gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+    const touched = (e: Event) => {
+      const t = e.target as HTMLElement | null;
+      this.flash(t?.closest?.(".ico, #swatch") as HTMLElement | null);
+    };
+    document.addEventListener("pointerdown", touched, true);
+    document.addEventListener("click", touched, true);
 
     this.resize();
     window.addEventListener("resize", () => this.resize());
@@ -207,8 +310,9 @@ export class GlassLayer {
     this.dirty = true;
   }
 
-  setPress(el: Element, v: number) {
-    this.press.set(el, v);
+  /** Kurzes Aufblitzen ausloesen, auch ohne Maus (Tastenkuerzel). */
+  flash(el: Element | null) {
+    if (el) this.flashAt.set(el, performance.now());
   }
 
   private resize() {
@@ -242,6 +346,121 @@ export class GlassLayer {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
+  /** Helligkeit eines Symbols: Grundwert, heller unter der Maus, heller
+   *  wenn das Werkzeug an ist, plus kurzer Blitz nach dem Klick. */
+  private glowOf(owner: HTMLElement, cs: CSSStyleDeclaration) {
+    let flash = 0;
+    const t0 = this.flashAt.get(owner);
+    if (t0 !== undefined) {
+      const f = 1 - (performance.now() - t0) / FLASH;
+      if (f > 0) flash = f * f;
+      else this.flashAt.delete(owner);
+    }
+    const hover = owner.matches(":hover") ? 1 : 0;
+    const on = owner.classList.contains("on") ? 1 : 0;
+    const dim = parseFloat(cs.opacity) || 1;
+    return {
+      alpha: Math.min(1, 0.62 + 0.22 * hover + 0.16 * on + 0.45 * flash) * dim,
+      glow: (0.3 * hover + 0.34 * on + 0.95 * flash) * dim,
+      on,
+    };
+  }
+
+  /** Alle Symbole eines Glaselements in eine Textur in dessen Groesse.
+   *  Wird nur neu gezeichnet, wenn sich wirklich etwas geaendert hat. */
+  private iconFor(el: HTMLElement, host: DOMRect, k: number) {
+    const svgs = Array.from(el.querySelectorAll("svg")) as SVGSVGElement[];
+    if (!svgs.length) return null;
+
+    const items: IconItem[] = [];
+    let glow = 0;
+    let col: [number, number, number] = [1, 1, 1];
+    for (const svg of svgs) {
+      const r = svg.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) continue;
+      const owner = (svg.parentElement ?? el) as HTMLElement;
+      const cs = getComputedStyle(owner);
+      if (cs.visibility === "hidden") continue;
+      const g = this.glowOf(owner, cs);
+      if (g.alpha < 0.02) continue;
+      items.push({ svg, r, rot: rotOf(getComputedStyle(svg)), alpha: g.alpha });
+      glow = Math.max(glow, g.glow);
+      // Eingeschaltet leuchtet violett, der Schliessen-Knopf unter der
+      // Maus rot - sonst weiss.
+      if (g.on) col = [0.72, 0.65, 1];
+      if (owner.classList.contains("danger") && owner.matches(":hover")) col = [1, 0.42, 0.38];
+    }
+    if (!items.length) return null;
+
+    const W = Math.max(2, Math.round(host.width * k));
+    const H = Math.max(2, Math.round(host.height * k));
+    const key =
+      W + "x" + H + "|" +
+      items
+        .map((i) =>
+          [
+            i.svg.innerHTML,
+            Math.round((i.r.x - host.x) * 8),
+            Math.round((i.r.y - host.y) * 8),
+            Math.round(i.r.width * 8),
+            i.rot.toFixed(2),
+            i.alpha.toFixed(2),
+          ].join(",")
+        )
+        .join(";");
+
+    const gl = this.gl;
+    const cached = this.icons.get(el);
+    if (cached && cached.key === key) return { tex: cached.tex, glow, col };
+
+    const cv = cached?.cv ?? document.createElement("canvas");
+    cv.width = W;
+    cv.height = H;
+    const c = cv.getContext("2d") as CanvasRenderingContext2D;
+    c.clearRect(0, 0, W, H);
+    c.lineCap = "round";
+    c.lineJoin = "round";
+    c.strokeStyle = "#fff";
+    c.fillStyle = "#fff";
+
+    for (const it of items) {
+      const vb = (it.svg.getAttribute("viewBox") ?? "0 0 24 24").split(/[\s,]+/).map(Number);
+      const [vx, vy, vw, vh] = vb.length === 4 ? vb : [0, 0, 24, 24];
+      c.save();
+      c.translate((it.r.x - host.x + it.r.width / 2) * k, (it.r.y - host.y + it.r.height / 2) * k);
+      if (it.rot) c.rotate(it.rot);
+      c.scale((it.r.width * k) / vw, (it.r.height * k) / vh);
+      c.translate(-vx - vw / 2, -vy - vh / 2);
+      c.lineWidth = parseFloat(it.svg.getAttribute("stroke-width") ?? "1.6");
+      for (const child of Array.from(it.svg.children)) {
+        const p = pathOf(child);
+        if (!p) continue;
+        const fill = child.getAttribute("fill");
+        const stroke = child.getAttribute("stroke");
+        if (fill && fill !== "none") {
+          c.globalAlpha = it.alpha * parseFloat(child.getAttribute("fill-opacity") ?? "1");
+          c.fill(p);
+        }
+        if (stroke !== "none") {
+          c.globalAlpha = it.alpha;
+          c.stroke(p);
+        }
+      }
+      c.restore();
+    }
+
+    const tex = cached?.tex ?? (gl.createTexture() as WebGLTexture);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    this.icons.set(el, { tex, key, cv });
+    return { tex, glow, col };
+  }
+
   private frame = () => {
     const gl = this.gl;
     // Achtung: offsetParent ist bei position:fixed immer null - taugt hier
@@ -257,6 +476,7 @@ export class GlassLayer {
 
     if (this.dirty) {
       this.painter(this.bctx, this.back.width, this.back.height);
+      gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.backTex);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.back);
@@ -294,7 +514,9 @@ export class GlassLayer {
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, this.b.tex);
       gl.uniform1i(this.uni(this.pGlass, "uBlur"), 1);
+      gl.uniform1i(this.uni(this.pGlass, "uIcon"), 2);
 
+      const k = this.dpr;
       for (const el of els) {
         const b = el.getBoundingClientRect();
         const cs = getComputedStyle(el);
@@ -303,12 +525,20 @@ export class GlassLayer {
         const [tr, tg, tb, ta] = tint
           ? tint.split(",").map(Number)
           : [0.05, 0.05, 0.07, 0.52];
+
+        // Symboltextur zuerst, sie belegt Einheit 2.
+        gl.activeTexture(gl.TEXTURE2);
+        const ico = this.iconFor(el, b, k);
+        gl.bindTexture(gl.TEXTURE_2D, ico ? ico.tex : this.blank);
+
         // Alles in Geraetepixeln, damit gl_FragCoord im Shader passt.
-        const k = this.dpr;
         gl.uniform1f(this.uni(this.pGlass, "uRadius"), rad * k);
         gl.uniform1f(this.uni(this.pGlass, "uDpr"), k);
         gl.uniform4f(this.uni(this.pGlass, "uTint"), tr, tg, tb, ta);
-        gl.uniform1f(this.uni(this.pGlass, "uPress"), this.press.get(el) ?? 0);
+        gl.uniform1f(this.uni(this.pGlass, "uHasIcon"), ico ? 1 : 0);
+        gl.uniform1f(this.uni(this.pGlass, "uGlow"), Math.min(1.4, ico?.glow ?? 0));
+        const c = ico?.col ?? [1, 1, 1];
+        gl.uniform3f(this.uni(this.pGlass, "uIconCol"), c[0], c[1], c[2]);
         this.quad(
           this.pGlass,
           [this.w * k, this.h * k],
