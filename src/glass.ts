@@ -134,7 +134,11 @@ void main() {
     vec2 ioff = off * uRes / uRect.zw * 0.55;
     core = texture(uIcon, iuv + ioff).a;
     halo = textureLod(uIcon, iuv + ioff, 2.5 + uIconLod).a;
-    wide = clamp(textureLod(uIcon, iuv + ioff * 0.4, 4.6 + uIconLod).a * 7.0, 0.0, 1.0);
+    // Sanft saettigen statt hart zu kappen: eine Verstaerkung mal clamp()
+    // erzeugt ein Plateau mit einer scharfen, unregelmaessigen Kante - genau
+    // das sieht man als Stoerung am Rand des Leuchtens. exp() saettigt weich,
+    // ohne je eine harte Kante zu ziehen.
+    wide = 1.0 - exp(-7.0 * textureLod(uIcon, iuv + ioff * 0.4, 4.6 + uIconLod).a);
   }
 
   // Toenung nach dem Hintergrund: je heller der Grund, desto dunkler die
