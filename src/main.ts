@@ -645,7 +645,8 @@ const lens = $<HTMLElement>("lens");
 const lensCv = $<HTMLCanvasElement>("lens-cv");
 const lensCtx = lensCv.getContext("2d") as CanvasRenderingContext2D;
 const LENS_ZOOM = 2.5;
-const LENS_SIZE = 96; // CSS-Px der scharfen Mitte, siehe #lens-cv im CSS
+const LENS_SIZE = 160; // CSS-Px der scharfen Mitte; auch Quelle fuer das Layout
+lens.style.setProperty("--lens-size", `${LENS_SIZE}px`);
 
 function overContainer(x: number, y: number) {
   const r = container.getBoundingClientRect();

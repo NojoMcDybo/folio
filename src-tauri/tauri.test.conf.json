@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Folio Test",
+  "mainBinaryName": "folio-test",
+  "version": "0.1.2",
+  "identifier": "de.nojo.folio.test",
+  "app": {
+    "windows": [
+      {
+        "title": "Folio Test",
+        "width": 980,
+        "height": 660,
+        "minWidth": 520,
+        "minHeight": 400,
+        "center": true,
+        "dragDropEnabled": true,
+        "decorations": false,
+        "shadow": true
+      }
+    ]
+  },
+  "bundle": {
+    "fileAssociations": []
+  }
+}

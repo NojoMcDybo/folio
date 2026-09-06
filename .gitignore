@@ -10,3 +10,6 @@ src-tauri/gen/
 .DS_Store
 Thumbs.db
 *.log
+
+# Lokale Testdateien, Installationspruefung und Arbeitsnotizen
+work/

@@ -180,9 +180,11 @@ body.no-gl .ico.danger:hover { background: #d13b3b; color: #fff; }
    bleibt normales Glas (GlassLayer malt dort die Kuppel wie ueberall
    sonst), nur die Mitte zeigt die scharfe, echte Vergroesserung. */
 #lens {
-  width: 130px;
-  height: 130px;
-  border-radius: 50%;
+  width: calc(var(--lens-size) + 34px);
+  height: calc(var(--lens-size) + 34px);
+  /* GlassLayer liest den Radius als Pixelzahl; Prozent wuerde dort 50px
+     ergeben und die groessere Lupe zu einem abgerundeten Rechteck machen. */
+  border-radius: 999px;
   translate: -50% -50%;
   pointer-events: none;
 }
@@ -191,8 +193,8 @@ body.no-gl .ico.danger:hover { background: #d13b3b; color: #fff; }
   position: absolute;
   inset: 0;
   margin: auto;
-  width: 96px;
-  height: 96px;
+  width: var(--lens-size);
+  height: var(--lens-size);
   border-radius: 50%;
   display: block;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
