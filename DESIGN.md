@@ -33,6 +33,8 @@ Referenz: [Apple: Meet Liquid Glass](https://developer.apple.com/videos/play/wwd
 
 ## Bedienelemente
 
+Version 0.3.1: Fortschritt in beiden Scrollleistengroessen ist rein weiss. Auf hellem Hintergrund ergaenzt die Helligkeitserkennung dunkle Kontur und Schatten; die ungefuellte Restflaeche wird dezent grau. Hysterese und weiche Uebergaenge stabilisieren den Wechsel. Beide Groessen auf weissem und dunklem Hintergrund im Browser visuell geprueft; WebGL und vorhandene UI-Pruefungen ohne Fehler.
+
 - Textmarker: breite, senkrechte Keilform mit Unterstreichung; Zeichenstift bleibt schmal und diagonal.
 - Anmerkungsmenue: allgemeines Werkzeugkasten-Symbol statt eines zweiten Stifts. Auswahlzustand wird am jeweiligen Werkzeug angezeigt.
 - Buttons haben zugaengliche Namen, Werkzeugauswahl aria-pressed, Menueoeffner aria-expanded, Suchfeld einen Namen und Platzhalter. Sichtbarer Tastaturfokus.

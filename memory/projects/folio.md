@@ -18,6 +18,8 @@ Phase 1 (0.3.0): Page chip reappears and persists on hover. Shared inversion fil
 
 ## User requests
 
+0.3.1 follow-up completed: User approved adaptive dark outline/shadow over bright backgrounds for both scrollbar sizes and pure white progress fill. Implemented, browser-checked and installed after user confirmed closing the app. Original app and shortcut unchanged.
+
 1. Make the magnifying glass bigger. Exact size undecided; greater magnification was not requested.
 2. Resolve pixelated borders on the liquid glass.
 3. Consider replacing the liquid glass effect as a whole, possibly followed by broader UI changes. Aim for an Apple-like feel; research existing implementations that can be reused or adapted.
