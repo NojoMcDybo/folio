@@ -1,6 +1,16 @@
 # Folio: reading and interface planning
 
-Recorded 2026-09-06; updated 2026-09-07. User approved an isolated first trial with a larger lens and a separately installed Folio Test. Other features remain in discussion. This document preserves the user's ideas, not a finalized implementation specification.
+Recorded 2026-09-06; updated 2026-09-07. User approved the first Folio Test trial, tried it successfully, and explicitly requested continuing only in the copy with the Apple-inspired UI. Original Claude source and installation must remain available. Remaining navigation/library features stay in discussion. This document preserves the user's ideas, not a finalized implementation specification.
+
+## Implemented in the copy: Folio Test 0.2.0
+
+- Worktree `D:\Dev\folio-test`, branch `codex/apple-ui`; first trial checkpoint `2838df9`. No remote push or merge to main.
+- Lens now 160px inside / 194px outside, unchanged 2.5x magnification.
+- Glass rebuilt with bounded refraction, antialiased edges, neutral sheen, no dark tint or RGB splitting; crisp SVG icons adapt to light/dark backdrop.
+- Neutral #202020 reading background, quieter library, blue UI accent, distinct broad highlighter and general toolbox opener. See `DESIGN.md`.
+- Installed 0.2.0 update and desktop shortcut verified; original executable, shortcut, and PDF association unchanged. Existing test-library entries visible after update.
+- Production browser UI checks passed at 100/125/200% scaling. Native start/library checked; further native input stopped when user activity was detected.
+- Destination-page labels, scroll-speed changes, double-click sizing, chapter access, page-chip hover, library/file deletion, and document inversion color correction are still pending.
 
 ## User requests
 
@@ -19,7 +29,7 @@ Recorded 2026-09-06; updated 2026-09-07. User approved an isolated first trial w
 13. Support both removing an entry from the library and deleting its underlying PDF file from the computer. User explicitly answered "Both". These are planned capabilities; no existing files are to be deleted during planning.
 14. Reduce the purple cast in whites when colors are inverted.
 
-## Current implementation evidence
+## Original implementation evidence (before the test changes)
 
 - `src/main.ts`: lens has a 96px inner diameter and 2.5x magnification; CSS sets the outer lens to 130px.
 - Scrollbar expands after one second and uses speeds [-1600, -150, 0, 150, 1600] px/s. Hover controls speed, while dragging maps to document position.

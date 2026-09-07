@@ -60,9 +60,10 @@ const ICON: Record<string, string> = {
   "b-invert": P('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" stroke="none"/>'),
   "b-save": P('<path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 19h14"/>'),
   // Marker: breite Keilspitze mit Farbspur. Stift: schmale Feder.
-  "t-mark": P('<path d="M4.5 20.5h15"/><path d="M8 17.5h3.5l7-7.2a2.4 2.4 0 0 0-3.4-3.4l-7.1 7.1z" fill="currentColor" fill-opacity=".35"/><path d="M8 17.5v-3.5"/>'),
+  "t-mark": P('<path d="M8 3h8v10l-3 4h-2l-3-4z"/><path d="M8 11h8M10 17v3h4v-3"/><path d="M6 21h12" stroke-width="2.5"/>'),
   "t-ink": P('<path d="m5 19 1-3.6 9.3-9.3a1.9 1.9 0 0 1 2.7 2.7L8.6 18z"/><path d="m14.2 7.6 2.2 2.2"/><path d="M5 19h-.5"/>'),
   "t-text": P('<path d="M5 6h14"/><path d="M12 6v13"/>'),
+  "a-toggle": P('<rect x="4" y="6" width="16" height="14" rx="4"/><path d="M9 6V4h6v2M4 11h16M10 11v3h4v-3"/>'),
   "find-prev": P('<path d="m7 14 5-5 5 5"/>'),
   "find-next": P('<path d="m7 10 5 5 5-5"/>'),
   "find-close": P('<path d="M6.5 6.5l11 11"/><path d="M17.5 6.5l-11 11"/>'),
@@ -73,7 +74,11 @@ const ICON: Record<string, string> = {
 
 for (const [id, svg] of Object.entries(ICON)) {
   const el = document.getElementById(id);
-  if (el) el.innerHTML = svg;
+  if (el) {
+    el.innerHTML = svg;
+    el.querySelector("svg")?.setAttribute("aria-hidden", "true");
+    if (el.title) el.setAttribute("aria-label", el.title);
+  }
 }
 
 const PLUS = P('<path d="M12 5v14"/><path d="M5 12h14"/>');
@@ -130,7 +135,8 @@ function renderHome() {
   const drop = document.createElement("button");
   drop.className = "tile drop";
   drop.title = "PDF öffnen oder hierher ziehen";
-  drop.innerHTML = `<span class="cover">${PLUS}</span><span class="name"></span>`;
+  drop.innerHTML = `<span class="cover">${PLUS}</span><span class="name">PDF öffnen</span>`;
+  drop.setAttribute("aria-label", "PDF öffnen");
   drop.addEventListener("click", () => void pick());
   grid.appendChild(drop);
 
@@ -177,7 +183,7 @@ function paintBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.filter = "none";
 
   if (!reader.hidden) {
-    ctx.fillStyle = "#000";
+    ctx.fillStyle = getComputedStyle(container).backgroundColor;
     ctx.fillRect(0, 0, w, h);
     if (container.classList.contains("invert")) {
       ctx.filter = "contrast(0.8) invert(1) hue-rotate(180deg)";
@@ -191,12 +197,7 @@ function paintBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
     return;
   }
 
-  ctx.fillStyle = "#08080a";
-  ctx.fillRect(0, 0, w, h);
-  const g1 = ctx.createRadialGradient(w * 0.22, -h * 0.12, 0, w * 0.22, -h * 0.12, w * 0.75);
-  g1.addColorStop(0, "#1c1c22");
-  g1.addColorStop(1, "rgba(28,28,34,0)");
-  ctx.fillStyle = g1;
+  ctx.fillStyle = getComputedStyle(home).backgroundColor;
   ctx.fillRect(0, 0, w, h);
   // Bewusst ohne die Deckelbilder: im Glas soll sich nur Dokumentinhalt
   // spiegeln, nicht die Bibliothek.
@@ -454,21 +455,17 @@ const toolBtn: Record<string, HTMLButtonElement> = {
   text: $<HTMLButtonElement>("t-text"),
 };
 
-/** Werkzeug, das zuletzt gewaehlt war - der Hauptknopf zeigt es an und
- *  schaltet es an und aus, ohne dass die Maus wandern muss. */
+/** Das zuletzt gewaehlte Werkzeug bleibt fuer den naechsten Klick erhalten. */
 let armed = "mark";
 let tool = "none";
 
-const TOOL_ICON: Record<string, string> = {
-  mark: ICON["t-mark"],
-  ink: ICON["t-ink"],
-  text: ICON["t-text"],
-};
-
 function paintTool(key: string) {
-  for (const [k, b] of Object.entries(toolBtn)) b.classList.toggle("on", k === key);
+  for (const [k, b] of Object.entries(toolBtn)) {
+    b.classList.toggle("on", k === key);
+    b.setAttribute("aria-pressed", String(k === key));
+  }
   btnTool.classList.toggle("on", key !== "none");
-  btnTool.innerHTML = TOOL_ICON[key === "none" ? armed : key];
+  btnTool.setAttribute("aria-pressed", String(key !== "none"));
 }
 
 function setTool(next: string) {
@@ -497,10 +494,11 @@ function applyColor() {
   eventBus.dispatch("switchannotationeditorparams", { source: window, type, value: colorInput.value });
 }
 
-function openAnn() { anngroup.classList.add("open"); }
+function openAnn() { anngroup.classList.add("open"); btnTool.setAttribute("aria-expanded", "true"); }
 
 function closeAnn() {
   anngroup.classList.remove("open");
+  btnTool.setAttribute("aria-expanded", "false");
   if (tool !== "none") setTool("none");
 }
 
@@ -787,7 +785,7 @@ scroller.addEventListener("pointermove", (e) => {
 });
 
 // Deckt sich mit dem Rand in styles.css (#scroller top: calc(...)).
-const TRACK_MARGIN = 64;
+const TRACK_MARGIN = 84;
 
 /** Ziehen setzt die Leseposition direkt, wie bei einer echten
  *  Bildlaufleiste: die Stelle im Fenster ist die Stelle im Dokument. */
@@ -877,8 +875,12 @@ function makeDraggable(el: HTMLElement, key: string) {
   let sx = 0, sy = 0, ox = 0, oy = 0, moved = false;
 
   const applyFixed = (x: number, y: number) => {
-    el.style.left = Math.round(x) + "px";
-    el.style.top = Math.round(y) + "px";
+    const bounds = el.getBoundingClientRect();
+    // Keep movable controls reachable after switching to a smaller window.
+    const left = Math.min(Math.max(10, x), Math.max(10, innerWidth - bounds.width - 10));
+    const top = Math.min(Math.max(10, y), Math.max(10, innerHeight - bounds.height - 10));
+    el.style.left = Math.round(left) + "px";
+    el.style.top = Math.round(top) + "px";
     el.style.right = "auto";
     el.style.bottom = "auto";
     el.style.translate = "0 0";

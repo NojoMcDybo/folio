@@ -6,7 +6,7 @@ Diese Arbeitskopie prueft den Weg von einer kleinen Aenderung zur installierten 
 
 - Original: `D:\Dev\folio`, Zweig `main`, Commit `1daad98a3523d0775f5e6bdb41b94cb4015777c2`.
 - Sicherung: `D:\Dev\folio-backups\2026-09-07-before-test` mit vollstaendigem Git-Bundle, Planungsnotizen und bisherigem Installer 0.1.0. Das Installer-Datum ist aelter als der aktuelle Quellstand; er wird als bisheriges Installationspaket aufbewahrt, nicht als nachgewiesener Build dieses Commits.
-- Entwicklung: `D:\Dev\folio-test`, Zweig `codex/folio-test-larger-lens`.
+- Entwicklung: `D:\Dev\folio-test`, Zweig `codex/apple-ui`. Der erste Versuch ist als Commit `2838df9` gesichert.
 
 ## Getrennte Testinstallation
 
@@ -36,7 +36,7 @@ Nur Testdokumente bearbeiten: Die App besitzt weiterhin die vorhandene Speicherf
 
 ## Spaeterer Update- und Repository-Schritt
 
-Nach gemeinsamer Sichtpruefung Testversion in der Test-Konfiguration erhoehen und erneut installieren. Name, Dateiname und Kennung unveraendert lassen; danach Verknuepfung und gespeicherte Bibliothek pruefen. GitHub-Push und Uebernahme nach main folgen erst nach gemeinsamer Durchsicht.
+Version 0.2.0 wurde als Update der Test-App installiert. Fuer weitere Updates Name, Dateiname und Kennung unveraendert lassen; danach Verknuepfung und gespeicherte Bibliothek pruefen. GitHub-Push und Uebernahme nach main folgen erst nach gemeinsamer Durchsicht.
 
 ## Rueckweg
 
@@ -44,11 +44,14 @@ Die Originalinstallation und `main` bleiben verfuegbar. Die Test-App kann separa
 
 ## Pruefstand am 2026-09-07
 
-- Version 0.1.1 gebaut, installiert und gestartet. Desktop-Verknuepfung zeigt auf `D:\Dev\folio-test-installed\folio-test.exe`.
+- Version 0.1.1 wurde vom Benutzer ausprobiert und als gut bewertet. Danach hat er die Fortsetzung in der Kopie und die Apple-UI-Arbeit beauftragt.
+- Version **0.2.0** gebaut, als Update installiert und nativ gestartet. Desktop-Verknuepfung zeigt auf `D:\Dev\folio-test-installed\folio-test.exe`.
 - Installer erstellt eigene Kennung und Verknuepfung ohne PDF-Dateizuordnung. Bestehende Folio-Verknuepfung und PDF-Standardprogramm vor/nach Installation identisch.
 - Installierte Programmdatei gegen Build verglichen: identisch bis auf den von Tauri erwarteten dreistelligen NSIS-Bundlemarker.
 - Bisherige Folio-Verknuepfung zeigt in den Claude-App-Datenordner; diese Installation wurde nicht ersetzt.
-- Benutzer prueft die App gerade selbst. Keine weiteren automatisierten Eingaben oder Installation waehrend dieses Tests.
-- Version 0.1.2 mit Korrektur des bei der Sichtpruefung erkannten eckigen aeusseren Lupenrands ist erfolgreich gebaut; Installer liegt unter `src-tauri/target/release/bundle/nsis/Folio Test_0.1.2_x64-setup.exe`. Diese Version ist noch nicht installiert oder visuell geprueft. Installation als Update erfolgt erst nach dem laufenden Benutzertest.
-- Oeffnen/Scrollen/Suche und die Lupe mit der erzeugten Test-PDF wurden noch nicht vollstaendig automatisiert geprueft. Build und App-Start sind geprueft; manuelle Bedienpruefung laeuft beim Benutzer.
+- Die Rundungskorrektur aus dem nicht installierten Zwischenbuild 0.1.2 ist in 0.2.0 enthalten.
+- Frontend- und nativer Release-Build erfolgreich. Produktions-Browserpruefung mit echtem PDF.js/WebGL bei 100, 125 und 200 Prozent Skalierung erfolgreich: PDF, Suche, Werkzeuge, Lupe, Invertierung, Kontrast auf weisser Seite, F11 und kleines Fenster. Native Datei-/Fensteraufrufe sind in dieser Browserpruefung ersetzt.
+- Native Sichtpruefung nach dem Update: neue Bibliothek dargestellt, vorhandene Eintraege weiterhin vorhanden. Weitere automatisierte Bedienung wurde nach erkannter Benutzereingabe beendet; native PDF-Bedienung ist fuer diese Version damit noch nicht vollstaendig geprueft.
+- Original-Programmdatei und Original-Verknuepfung per SHA256 vor/nach Update identisch; PDF-Dateizuordnung unveraendert. Original-Quellstand bleibt `1daad98a3523d0775f5e6bdb41b94cb4015777c2` ohne Aenderungen an versionierten Dateien.
+- Installer: `src-tauri/target/release/bundle/nsis/Folio Test_0.2.0_x64-setup.exe`, SHA256 `4C591630843364050DE4E0F17B55A56298CBED2055128776381ADF3D2DDFE00E`.
 - Kein GitHub-Push und keine Uebernahme nach main erfolgt.
