@@ -15,7 +15,7 @@ precision highp float;
 uniform sampler2D uBack;
 uniform vec2 uRes, uTexel;
 uniform vec4 uRect;
-uniform float uRadius, uScale, uOpacity, uHover, uPanel, uFill;
+uniform float uRadius, uScale, uOpacity, uHover, uPanel, uFill, uLight;
 out vec4 outColor;
 float sdf(vec2 p, vec2 b, float r) {
   vec2 q = abs(p) - b + r;
@@ -64,7 +64,9 @@ void main() {
     float fill = 1.0 - smoothstep(uFill - 0.01, uFill + 0.01, y);
     // Both scrollbar sizes use a luminous neutral white material.
     col = mix(col, vec3(1.0), 0.34 + 0.10 * uHover);
-    col = mix(col, vec3(1.0), 0.32 * fill);
+    // A light backdrop needs a grey track so the white progress stays readable.
+    col = mix(col, vec3(0.55), 0.65 * uLight);
+    col = mix(col, vec3(1.0), fill);
   }
   outColor = vec4(col, coverage * uOpacity);
 }`;
@@ -121,6 +123,7 @@ export class GlassLayer {
   private lost = false;
   private painter: Painter = () => {};
   private contrast = new WeakMap<HTMLElement, boolean>();
+  private lightLevels = new WeakMap<HTMLElement, number>();
 
   constructor(private canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", { alpha: true, premultipliedAlpha: false, antialias: false });
@@ -226,6 +229,10 @@ export class GlassLayer {
       const r = el.getBoundingClientRect();
       if (r.width < 1 || r.height < 1 || r.bottom < 0 || r.top > innerHeight) continue;
       this.updateContrast(el, r);
+      const targetLight = this.contrast.get(el) ? 1 : 0;
+      const previousLight = this.lightLevels.get(el) ?? targetLight;
+      const light = previousLight + (targetLight - previousLight) * 0.12;
+      this.lightLevels.set(el, light);
       const radiusText = getComputedStyle(el).borderTopLeftRadius.split(" ")[0];
       const radius = radiusText.endsWith("%") ? parseFloat(radiusText) / 100 * Math.min(r.width, r.height) : parseFloat(radiusText);
       const k = this.scale;
@@ -236,6 +243,7 @@ export class GlassLayer {
       gl.uniform1f(this.uniform("uHover"), el.matches(":hover") ? 1 : 0);
       gl.uniform1f(this.uniform("uPanel"), el.dataset.glass === "panel" ? 1 : 0);
       gl.uniform1f(this.uniform("uFill"), el.dataset.fill === undefined ? -1 : Number(el.dataset.fill));
+      gl.uniform1f(this.uniform("uLight"), light);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
   };

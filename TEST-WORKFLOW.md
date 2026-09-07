@@ -1,5 +1,7 @@
 # Folio Test
 
+Neuestes Update: **0.3.1** installiert, mit adaptivem Scrollleistenkontrast und reinweisser Fortschrittsfuellung. Frontend-/Release-Build sowie Browserpruefung und Sichtpruefung beider Groessen auf hellen/dunklen Flaechen erfolgreich. Installierte Datei und Desktop-Ziel verifiziert; Original-App, Original-Verknuepfung und PDF-Dateizuordnung unveraendert. Installer-SHA256: `0BC3F2F65F8A25052C606D961E2E0F33FFDD2602962311149ABC5F8F8FA81BC8`.
+
 Aktuelle Version: **0.3.0** installiert. Phase 1 umfasst Hover-Seitenzahl, Doppelklick auf freie Seitenflaeche (Seitenbreite/vorheriger Zoom) und eine gemeinsame weniger gesaettigte Invertierung. Frontend-/Release-Build und erweiterte Browserpruefung erfolgreich. Installierte Datei entspricht dem Build mit erwartetem NSIS-Marker; Desktop-Ziel sowie Original-App/Verknuepfung/PDF-Zuordnung geprueft. Native Bedienpruefung dieser neuen Funktionen steht beim Benutzer aus. Installer-SHA256: `6CB0224E32327919658ED9C414D768EEE336B2EFF6ECA6BB3D091386B04AAB16`.
 
 Vorheriges Update: **0.2.1** mit helleren weissen Scrollleisten installiert. Frontend-/Release-Build und Browserpruefung einschliesslich Hover-Aufklappen erfolgreich; beide Groessen visuell geprueft. Installierte Datei gegen Build und Desktop-Ziel geprueft, Original-App/Verknuepfung/PDF-Zuordnung unveraendert. Installer-SHA256: `07BE9E2A6BD52DFAECEE702CE4142D349DFFAC58D6E410E754514A6DEB1C4407`.

@@ -165,6 +165,7 @@ body.no-gl #glasslayer { display: none; }
     width 0.36s var(--spring),
     height 0.36s var(--spring),
     right 0.36s var(--spring),
+    box-shadow 0.25s var(--ease),
     opacity 0.34s var(--ease);
 }
 
@@ -187,6 +188,10 @@ body.no-gl #glasslayer { display: none; }
 }
 
 body.no-gl #scroller { background: rgba(255, 255, 255, 0.65); }
+
+#scroller.glass--light {
+  box-shadow: 0 0 0 1px rgba(35, 35, 38, 0.5), 0 2px 9px rgba(0, 0, 0, 0.28), 0 0 3px rgba(255, 255, 255, 0.18);
+}
 
 /* Lupe: der Suchknopf wird beim Ziehen ueber die Seite dazu. Der Ring
    bleibt normales Glas (GlassLayer malt dort die Kuppel wie ueberall
