@@ -5,6 +5,7 @@
   --reader-bg: #202020;
   --library-bg: #1c1c1e;
   --control-size: 40px;
+  --pdf-invert-filter: contrast(0.8) invert(1) hue-rotate(180deg) saturate(0.65);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --spring: cubic-bezier(0.22, 1.18, 0.36, 1);
   --bar-h: 34px;
@@ -139,7 +140,7 @@ body.no-gl #glasslayer { display: none; }
   color: var(--glass-ink);
   opacity: 0;
 }
-#pagechip.show { opacity: 1; }
+#pagechip.show, #pagechip:hover { opacity: 1; }
 #b-save { bottom: 22px; right: 22px; }
 
 /* Die Bildlaufleiste: ein schmaler Stab an der Seite. Nach einer Sekunde
@@ -434,7 +435,7 @@ body.dragging .drop .cover svg { stroke: var(--accent); transform: scale(1.25); 
 
 #container.invert .pdfViewer .page { background: #101010; }
 #container.invert .pdfViewer .canvasWrapper canvas {
-  filter: contrast(0.8) invert(1) hue-rotate(180deg);
+  filter: var(--pdf-invert-filter);
 }
 
 /* ---------- PDF.js an unser Aussehen anpassen ---------- */

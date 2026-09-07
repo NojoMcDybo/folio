@@ -4,10 +4,12 @@ Der Benutzer hat die neue Apple-inspirierte Oberflaeche positiv bewertet. Sie bl
 
 ## 1. Kleine Verbesserungen beim Lesen
 
+Umgesetzt in 0.3.0: Hover-Seitenzahl, gemeinsame weniger gesaettigte Invertierung und Doppelklick auf freie Seitenflaechen. Der Benutzer hat Seitenbreite mit Rueckkehr zum vorherigen Zoom bestaetigt; Doppelklick auf Text bleibt Wortauswahl. Die konkrete Farbwiedergabe kann anhand seiner Dokumente weiter abgestimmt werden.
+
 - Beide Scrollleisten neutral weisser und heller leuchten lassen (Version 0.2.1).
 - Seitenzahl unten links bei Hover wieder zeigen und sichtbar halten.
 - Violettstich invertierter Dokumente anhand einer Farb-/Graustufen-Testseite korrigieren; PDF, Lupe und Glas muessen dieselbe Farbumwandlung verwenden.
-- Doppelklick zum Vergroessern im bestehenden Fenster. Vorschlag: zwischen Seitenbreite und vorheriger Zoomstufe wechseln. Textauswahl darf dabei nicht unbeabsichtigt ausgeloest oder verhindert werden; Geste vor Umsetzung festlegen.
+- Doppelklick auf freie PDF-Flaeche wechselt zwischen Seitenbreite und vorheriger Zoomstufe. Text, interaktive PDF-Elemente und aktives Zeichen-/Markierungswerkzeug behalten ihre eigenen Gesten.
 
 ## 2. Scrollnavigation zusammen ueberarbeiten
 

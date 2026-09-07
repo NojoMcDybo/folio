@@ -42,7 +42,14 @@ Referenz: [Apple: Meet Liquid Glass](https://developer.apple.com/videos/play/wwd
 
 ## Grenzen dieser Runde
 
-Keine neue Kapitel-/Seiten-Navigation, keine Loeschfunktion und keine Aenderung der Scrollgeschwindigkeiten. Die PDF-Invertierungsformel bleibt erhalten; der violette UI-Akzent wurde durch Blau ersetzt. Die konkrete Farbwiedergabe invertierter Dokumente bleibt eine eigene Aufgabe.
+### Lesekomfort in 0.3.0
+
+- Seitenzahl erscheint beim Hover und bleibt unter dem Cursor sichtbar; dort zeigt sie die aktuelle Seite statt eines eventuell zuvor eingeblendeten Zoomwerts. F11 blendet sie weiterhin aus.
+- Doppelklick auf freie Seitenflaeche wechselt zu Seitenbreite und zurueck zum vorherigen Zoom. Bei Fensterwechsel bleibt der vergroesserte Modus auf Seitenbreite. Strg+Mausrad beendet diesen Modus; Strg+0 setzt auf die bisherige Anfangsgroesse zurueck. Textauswahl, Links/Formulare und Anmerkungswerkzeuge werden ausgespart.
+- Gemeinsame CSS-Variable fuer Invertierung in PDF, Lupe und Glas: bestehende Umwandlung plus `saturate(0.65)`. Das mindert auch andere Farbstiche und kraeftige Farben. Graustufen bleiben neutral. Keine Behauptung, die Ursache des benutzerspezifischen Violettstichs sei bereits nachgewiesen.
+- Browserpruefung mit echter Test-PDF: Hover nach Ausblendung und ueber Timeout hinaus, F11 waehrend Hover, Vergroessern/Rueckkehr, Fensteranpassung, Wortauswahl, Zeichenmodus. Farbprobe: graue Kanaele 94/94/94; Kanalspreizung leicht getoenter Probe von 8 auf 5 reduziert; Rot weiterhin erkennbar.
+
+Keine neue Kapitel-/Seiten-Navigation, keine Loeschfunktion und keine Aenderung der Scrollgeschwindigkeiten. Der violette UI-Akzent wurde durch Blau ersetzt.
 
 ## Pruefung
 

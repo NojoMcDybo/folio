@@ -37,6 +37,7 @@ const grid = $<HTMLElement>("grid");
 const reader = $<HTMLElement>("reader");
 const container = $<HTMLDivElement>("container");
 const pagechip = $<HTMLElement>("pagechip");
+const PDF_INVERT_FILTER = getComputedStyle(document.documentElement).getPropertyValue("--pdf-invert-filter").trim();
 const findbar = $<HTMLElement>("findbar");
 const findInput = $<HTMLInputElement>("find-q");
 const findCount = $<HTMLElement>("find-count");
@@ -186,7 +187,7 @@ function paintBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
     ctx.fillStyle = getComputedStyle(container).backgroundColor;
     ctx.fillRect(0, 0, w, h);
     if (container.classList.contains("invert")) {
-      ctx.filter = "contrast(0.8) invert(1) hue-rotate(180deg)";
+      ctx.filter = PDF_INVERT_FILTER;
     }
     for (const cv of container.querySelectorAll("canvas")) {
       const r = cv.getBoundingClientRect();
@@ -254,20 +255,48 @@ linkService.setViewer(pdfViewer);
 let currentPath: string | null = null;
 let pendingPage = 1;
 let dirty = false;
+let zoomBeforeFit: number | null = null;
 
 function fitOpen() {
   if (!pdfViewer.pdfDocument) return;
+  zoomBeforeFit = null;
   pdfViewer.currentScaleValue = "page-width";
   pdfViewer.currentScale *= OPEN_WIDTH;
 }
 
 let chipTimer = 0;
 function flashChip(text: string) {
-  pagechip.textContent = text;
+  pagechip.textContent = pagechip.matches(":hover") ? currentPageText() : text;
   pagechip.classList.add("show");
   window.clearTimeout(chipTimer);
   chipTimer = window.setTimeout(() => pagechip.classList.remove("show"), 1600);
 }
+
+function currentPageText() { return pdfViewer.currentPageNumber + " / " + pdfViewer.pagesCount; }
+pagechip.addEventListener("pointerenter", () => {
+  if (pdfViewer.pdfDocument) pagechip.textContent = currentPageText();
+});
+
+// Blank paper toggles reading width; text, links and editing keep their gestures.
+container.addEventListener("dblclick", (e) => {
+  const target = e.target instanceof Element ? e.target : null;
+  const page = target?.closest<HTMLElement>(".page");
+  if (!page || !pdfViewer.pdfDocument || tool !== "none" || e.button !== 0 ||
+      e.ctrlKey || e.metaKey || e.altKey || e.shiftKey ||
+      target?.closest(".textLayer span, .annotationLayer, .annotationEditorLayer, a, input, textarea, [contenteditable=true]")) return;
+  e.preventDefault();
+  const pageNumber = Number(page.dataset.pageNumber);
+  if (pageNumber > 0) pdfViewer.currentPageNumber = pageNumber;
+  if (zoomBeforeFit === null) {
+    zoomBeforeFit = pdfViewer.currentScale;
+    pdfViewer.currentScaleValue = "page-width";
+  } else {
+    const previous = zoomBeforeFit;
+    zoomBeforeFit = null;
+    pdfViewer.currentScale = previous;
+  }
+  flashChip(currentPageText());
+});
 
 let toastTimer = 0;
 function say(msg: string) {
@@ -311,7 +340,11 @@ container.addEventListener(
 );
 window.addEventListener("resize", () => {
   window.clearTimeout(resizeTimer);
-  resizeTimer = window.setTimeout(() => { fitOpen(); glass?.invalidate(); }, 160);
+  resizeTimer = window.setTimeout(() => {
+    if (zoomBeforeFit !== null) pdfViewer.currentScaleValue = "page-width";
+    else fitOpen();
+    glass?.invalidate();
+  }, 160);
 });
 let resizeTimer = 0;
 
@@ -561,6 +594,7 @@ container.addEventListener(
   (e) => {
     if (!(e.ctrlKey || e.metaKey) || !pdfViewer.pdfDocument) return;
     e.preventDefault();
+    zoomBeforeFit = null;
     const f = e.deltaY < 0 ? 1.1 : 1 / 1.1;
     pdfViewer.currentScale = Math.min(6, Math.max(0.1, pdfViewer.currentScale * f));
     flashChip(Math.round(pdfViewer.currentScale * 100) + " %");
@@ -672,7 +706,7 @@ function paintLens(x: number, y: number) {
   // Invertiert-Modus faerbt die Seiten-Canvas per CSS-Filter um - sonst
   // zeigt die Lupe die falschen Farben.
   lensCv.style.filter = container.classList.contains("invert")
-    ? "contrast(0.8) invert(1) hue-rotate(180deg)"
+    ? PDF_INVERT_FILTER
     : "";
 }
 

@@ -6,13 +6,15 @@ Recorded 2026-09-06; updated 2026-09-07. User approved the first Folio Test tria
 
 Follow-up: User likes this visual direction. Requested a short work plan (now `ARBEITSPLAN.md`) and brighter white glow for both scrollbar sizes (0.2.1).
 
+Phase 1 (0.3.0): Page chip reappears and persists on hover. Shared inversion filter reduces saturation to 0.65 to soften tint, preserving neutral grayscale. User explicitly accepted double-click on blank page to toggle page-width/previous zoom while keeping text double-click for word selection. Implemented and browser-tested, including resize and drawing-mode exclusions. Remaining navigation and library phases are still pending.
+
 - Worktree `D:\Dev\folio-test`, branch `codex/apple-ui`; first trial checkpoint `2838df9`. No remote push or merge to main.
 - Lens now 160px inside / 194px outside, unchanged 2.5x magnification.
 - Glass rebuilt with bounded refraction, antialiased edges, neutral sheen, no dark tint or RGB splitting; crisp SVG icons adapt to light/dark backdrop.
 - Neutral #202020 reading background, quieter library, blue UI accent, distinct broad highlighter and general toolbox opener. See `DESIGN.md`.
 - Installed 0.2.0 update and desktop shortcut verified; original executable, shortcut, and PDF association unchanged. Existing test-library entries visible after update.
 - Production browser UI checks passed at 100/125/200% scaling. Native start/library checked; further native input stopped when user activity was detected.
-- Destination-page labels, scroll-speed changes, double-click sizing, chapter access, page-chip hover, library/file deletion, and document inversion color correction are still pending.
+- Destination-page labels, scroll-speed changes, chapter access and library/file deletion are still pending. Inversion is now softened in 0.3.0; user-document colour feedback may require further tuning.
 
 ## User requests
 
