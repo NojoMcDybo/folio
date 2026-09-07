@@ -15,7 +15,7 @@ precision highp float;
 uniform sampler2D uBack;
 uniform vec2 uRes, uTexel;
 uniform vec4 uRect;
-uniform float uRadius, uScale, uOpacity, uHover, uPanel, uFill, uLight, uWideScroll;
+uniform float uRadius, uScale, uOpacity, uHover, uPanel, uFill, uLight, uWideScroll, uChapter;
 out vec4 outColor;
 float sdf(vec2 p, vec2 b, float r) {
   vec2 q = abs(p) - b + r;
@@ -60,6 +60,9 @@ void main() {
   float rim = exp(-pow((depth - 0.7) / 0.65, 2.0));
   col += vec3(rim * (0.10 + 0.32 * facing + 0.06 * uHover));
   col += vec3(0.025 * edge * facing);
+  // Keep light chapter text readable while retaining refraction from the PDF.
+  float localLight = smoothstep(0.20, 0.72, dot(soft, vec3(0.2126, 0.7152, 0.0722)));
+  col = mix(col, vec3(0.09), uChapter * mix(0.30, 0.78, max(uLight, localLight)));
   if (uFill >= 0.0) {
     float y = (frag.y - uRect.y) / uRect.w;
     float fill = 1.0 - smoothstep(uFill - 0.01, uFill + 0.01, y);
@@ -126,6 +129,7 @@ export class GlassLayer {
   private painter: Painter = () => {};
   private contrast = new WeakMap<HTMLElement, boolean>();
   private lightLevels = new WeakMap<HTMLElement, number>();
+  private chapterSurfaces = new WeakMap<HTMLElement, { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D }>();
 
   constructor(private canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", { alpha: true, premultipliedAlpha: false, antialias: false });
@@ -243,11 +247,30 @@ export class GlassLayer {
       gl.uniform1f(this.uniform("uRadius"), radius * k);
       gl.uniform1f(this.uniform("uOpacity"), opacity);
       gl.uniform1f(this.uniform("uHover"), el.matches(":hover") ? 1 : 0);
-      gl.uniform1f(this.uniform("uPanel"), el.dataset.glass === "panel" ? 1 : 0);
+      gl.uniform1f(this.uniform("uPanel"), el.dataset.glass === "panel" || el.dataset.glass === "chapter" ? 1 : 0);
+      gl.uniform1f(this.uniform("uChapter"), el.dataset.glass === "chapter" ? 1 : 0);
       gl.uniform1f(this.uniform("uFill"), el.dataset.fill === undefined ? -1 : Number(el.dataset.fill));
       gl.uniform1f(this.uniform("uLight"), light);
       gl.uniform1f(this.uniform("uWideScroll"), el.id === "scroller" ? Math.max(0, Math.min(1, (r.width - 9) / 19)) : 0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      if (el.dataset.glass === "chapter") {
+        // Put this material in the panel's own stacking context, above other controls.
+        let surface = this.chapterSurfaces.get(el);
+        if (!surface) {
+          const canvas = document.createElement("canvas");
+          canvas.className = "chapter-surface";
+          canvas.setAttribute("aria-hidden", "true");
+          surface = { canvas, ctx: canvas.getContext("2d")! };
+          el.prepend(canvas);
+          this.chapterSurfaces.set(el, surface);
+        }
+        const width = Math.max(1, Math.round(r.width * k));
+        const height = Math.max(1, Math.round(r.height * k));
+        if (surface.canvas.width !== width) surface.canvas.width = width;
+        if (surface.canvas.height !== height) surface.canvas.height = height;
+        surface.ctx.clearRect(0, 0, width, height);
+        surface.ctx.drawImage(this.canvas, r.x * k, r.y * k, r.width * k, r.height * k, 0, 0, width, height);
+      }
     }
   };
 }

@@ -5,6 +5,7 @@
 - User's UI and reading improvements are recorded in `memory/projects/folio.md`.
 
 ## Current preferences and scope
+- 2026-09-07: User explicitly requests Astra Advisor for the further project workflow. Use its installed orchestration skill, including independent review for substantial implementation and honest unavailable usage reporting when telemetry is absent. Current skill path: `C:/Users/nojod/.codex/plugins/cache/astra-advisor/astra-advisor/0.2.0/skills/orchestration/SKILL.md`.
 - 2026-09-07: User approved the first isolated workflow trial: back up the original, enlarge the lens in a separate worktree, build/install Folio Test with its own desktop shortcut, and try it together. The broader redesign remains in planning. Upload/merge follows joint review later.
 - Aim for an Apple-like feel; reconsider the glass effect and potentially the overall UI. User wants clear glass without the current darkening, smoother borders, and calmer reading colors.
 - Keep user requests distinct from assistant suggestions and unresolved interpretations.

@@ -984,7 +984,7 @@ function savePos(p: Record<string, { x: number; y: number }>) {
   try { localStorage.setItem(POSKEY, JSON.stringify(p)); } catch { /* egal */ }
 }
 
-function makeDraggable(el: HTMLElement, key: string) {
+function makeDraggable(el: HTMLElement, key: string, options: { handle?: string; home?: () => { x: number; y: number } } = {}) {
   let home: { x: number; y: number } | null = null;
   let sx = 0, sy = 0, ox = 0, oy = 0, moved = false;
 
@@ -1003,6 +1003,7 @@ function makeDraggable(el: HTMLElement, key: string) {
   /** Ausgangsstelle messen: dafuer die eigenen Angaben kurz abraeumen,
    *  damit wieder die Regel aus dem Stylesheet greift. */
   const measureHome = () => {
+    if (options.home) return options.home();
     const keep = {
       left: el.style.left, top: el.style.top,
       right: el.style.right, bottom: el.style.bottom,
@@ -1016,15 +1017,18 @@ function makeDraggable(el: HTMLElement, key: string) {
 
   // Erst messen, wenn das Element sichtbar ist - versteckt liefert es Null.
   refreshers.push(() => {
+    if (!el.getClientRects().length) return;
     home = measureHome();
     const s = loadPos()[key];
     if (s) applyFixed(s.x, s.y);
+    else if (options.home) applyFixed(home.x, home.y);
   });
 
   let active = false;
 
   el.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
+    if (options.handle && (!(e.target as HTMLElement).closest(options.handle) || (e.target as HTMLElement).closest("button"))) return;
     if ((e.target as HTMLElement).closest("input")) return;
     const r = el.getBoundingClientRect();
     sx = e.clientX; sy = e.clientY; ox = r.x; oy = r.y;
@@ -1060,7 +1064,8 @@ function makeDraggable(el: HTMLElement, key: string) {
     if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
     el.classList.remove("grabbing");
     if (!moved) return;
-    const r = el.getBoundingClientRect();
+    // Store layout coordinates, excluding the temporary pressed-button scale.
+    const r = { x: parseFloat(el.style.left), y: parseFloat(el.style.top) };
     const p = loadPos();
     if (home && Math.hypot(r.x - home.x, r.y - home.y) < SNAP) {
       // Nah genug an der Ausgangsstelle: dorthin zurueckfedern.
@@ -1080,6 +1085,16 @@ function makeDraggable(el: HTMLElement, key: string) {
 
 makeDraggable($<HTMLElement>("b-find"), "find");
 makeDraggable($<HTMLElement>("b-invert"), "invert");
+makeDraggable($<HTMLElement>("b-outline"), "outline");
+makeDraggable($<HTMLElement>("outline-panel"), "outlinePanel", {
+  handle: ".outline-header",
+  home: () => {
+    const r = $<HTMLElement>("b-outline").getBoundingClientRect();
+    return { x: r.left - 50, y: r.bottom + 12 };
+  },
+});
+$<HTMLElement>("outline-panel").addEventListener("outlineopen", refreshDrag);
+new ResizeObserver(refreshDrag).observe($<HTMLElement>("outline-panel"));
 makeDraggable($<HTMLElement>("anngroup"), "ann");
 makeDraggable(findbar, "findbar");
 

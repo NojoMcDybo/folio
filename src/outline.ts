@@ -41,6 +41,7 @@ export class OutlinePanel {
     if (!this.panel.hidden) { this.close(true); return; }
     this.onOpen();
     this.panel.hidden = false;
+    this.panel.dispatchEvent(new Event("outlineopen"));
     this.toggleButton.setAttribute("aria-expanded", "true");
     this.toggleButton.classList.add("on");
     if (!this.loaded) void this.load();

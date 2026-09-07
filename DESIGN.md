@@ -33,6 +33,14 @@ Referenz: [Apple: Meet Liquid Glass](https://developer.apple.com/videos/play/wwd
 
 ## Bedienelemente
 
+### Kapitelglas 0.5.1
+
+- Kapitelmenue nutzt den bestehenden WebGL-Glasrenderer mit Lichtbrechung und Streuung. Helle Bereiche werden lokal sowie anhand der bestehenden Helligkeitserkennung abgedunkelt; helle Texte bleiben auch ueber gemischtem Papier/Hintergrund lesbar.
+- Die Glasflaeche wird zusaetzlich innerhalb der Menueebene gezeichnet, sodass andere schwebende Knoepfe nicht ueber Kapiteltext erscheinen. CSS-Ersatz bei fehlendem WebGL und reduzierter Transparenz.
+- Kapitelknopf ist frei verschiebbar. Das Menue laesst sich an der Kopfzeile verschieben; Liste und Schliessknopf loesen kein Ziehen aus. Beide Positionen werden mit dem vorhandenen System gespeichert. Ohne eigene Menueposition oeffnet es in der Naehe des Knopfs; Vergroessern des Inhalts und Fensteraenderungen halten es erreichbar.
+- Scrollbereich liegt unterhalb der festen Kopfzeile. Runde weisse Innenleiste mit vier Pixeln sichtbarer Breite und schwachem Schein; sie scrollt nur die Kapitelliste.
+- Gemeinsame Positionsspeicherung korrigiert: speichert Layoutkoordinaten ohne temporaere Druckanimation. Pruefungen von Positionserhalt, Neustart, kleinem Fenster, hellem/gemischtem Hintergrund, internem Scrollen und bestehender Kapitel-/UI-Bedienung bestanden.
+
 ### Kapitelzugriff und Scrollkorrektur 0.5.0
 
 - Inhaltsverzeichnis-Knopf links neben den Lesebedienelementen. Lesbares dunkles Panel mit verschachtelten Listen, separaten Aufklappknoepfen und Seitenbezeichnungen. Unterkapitel starten eingeklappt; aktives Kapitel wird anhand der Leseseite hervorgehoben.

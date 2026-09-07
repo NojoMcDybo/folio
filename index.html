@@ -24,14 +24,16 @@
       <div id="container"><div id="viewer" class="pdfViewer"></div></div>
 
       <button id="b-home" class="ico glass solo" title="Bibliothek"></button>
-      <button id="b-outline" class="ico glass solo" title="Inhaltsverzeichnis" aria-expanded="false" aria-controls="outline-panel"></button>
-      <aside id="outline-panel" aria-labelledby="outline-heading" hidden>
+      <button id="b-outline" class="ico glass solo drag" title="Inhaltsverzeichnis" aria-expanded="false" aria-controls="outline-panel"></button>
+      <aside id="outline-panel" class="glass drag" data-glass="chapter" aria-labelledby="outline-heading" hidden>
         <header class="outline-header">
           <h2 id="outline-heading">Inhaltsverzeichnis</h2>
           <button id="outline-close" class="ico sm" title="Inhaltsverzeichnis schließen"></button>
         </header>
-        <p id="outline-status" role="status"></p>
-        <nav id="outline-list" aria-label="PDF-Kapitel"></nav>
+        <div id="outline-content">
+          <p id="outline-status" role="status"></p>
+          <nav id="outline-list" aria-label="PDF-Kapitel"></nav>
+        </div>
       </aside>
       <button id="b-find" class="ico glass solo drag" title="Suchen · Strg+F"></button>
       <button id="b-invert" class="ico glass solo drag" title="Invertieren · Strg+I"></button>

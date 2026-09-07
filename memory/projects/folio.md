@@ -18,6 +18,8 @@ Phase 1 (0.3.0): Page chip reappears and persists on hover. Shared inversion fil
 
 ## User requests
 
+0.5.1: User requested liquid-glass chapter menu with darkening on bright backgrounds, draggable like other controls, and a subtler small-style white internal scrollbar. Implemented for both opener and menu header, saved positions, adaptive material and independently scrolling content. User also explicitly requests Astra Advisor skill for subsequent project work; recorded in CLAUDE.md.
+
 0.5.0: User requested scroll-speed calculation to start only outside the zero zone, then chapter access. Removed the fixed initial speed; quadratic ramp starts at zero at the zone boundary. Added hierarchical PDF bookmark panel with destination/page-label resolution and unchanged zoom. Browser-tested with real nested/named/broken/external bookmark fixtures and no-bookmark PDF; existing scroll/UI checks pass.
 
 0.4.0: User requested implementing/refining scroll navigation. First trial uses target page label next to cursor, retained hover auto-scroll, click-to-jump/pause, and continuous quadratic speed with a 16% central stop zone. The optional gesture question remains unanswered; this is the assistant's stated test assumption, not an explicitly selected user preference. Navigation tests passed with 3/60 pages, varied page heights and small windows. Chapter access and library deletion remain pending.
