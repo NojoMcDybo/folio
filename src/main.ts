@@ -9,6 +9,7 @@ import {
 import "pdfjs-dist/web/pdf_viewer.css";
 import "./styles.css"; // muss nach pdf_viewer.css kommen
 import { GlassLayer } from "./glass";
+import { clampPosition, pageAtPosition, speedAtPosition } from "./scroll-navigation";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -758,44 +759,70 @@ function paintProgress() {
   scroller.style.setProperty("--scroller-p", String(Math.min(1, Math.max(0, p))));
 }
 
-/** Fuenf unsichtbare Felder von oben nach unten: schnell hoch, langsam
- *  hoch (Lesetempo), Ruhe, langsam runter (Lesetempo), schnell runter
- *  (Ueberfliegen). Nur per Hover erreichbar. */
-const SPEED = [-1600, -150, 0, 150, 1600];
-let zone = 2;
+const scrollTarget = $<HTMLElement>("scroll-target");
+let targetSpeed = 0;
+let currentSpeed = 0;
 let autoId = 0;
 let lastTick = 0;
 let dragging = false;
+let press: { x: number; y: number; wide: boolean; moved: boolean; pointerId: number } | null = null;
 
 function tick(t: number) {
   const dt = lastTick ? Math.min(0.05, (t - lastTick) / 1000) : 0;
   lastTick = t;
-  if (SPEED[zone]) container.scrollTop += SPEED[zone] * dt;
+  currentSpeed += (targetSpeed - currentSpeed) * (1 - Math.exp(-dt / 0.14));
+  container.scrollTop += currentSpeed * dt;
   autoId = requestAnimationFrame(tick);
 }
 
 function startAuto() {
-  lastTick = 0;
-  if (!autoId) autoId = requestAnimationFrame(tick);
+  if (!autoId) { lastTick = 0; autoId = requestAnimationFrame(tick); }
 }
 
 function stopAuto() {
   if (autoId) cancelAnimationFrame(autoId);
   autoId = 0;
-  zone = 2;
+  targetSpeed = currentSpeed = lastTick = 0;
 }
 
 let wideTimer = 0;
 let leaveTimer = 0;
+let lastPointer: { x: number; y: number } | null = null;
 
-scroller.addEventListener("pointerenter", () => {
+function widePosition(y: number) {
+  // Stable final bounds avoid changing the target during the opening animation.
+  return clampPosition((y - innerHeight * 0.13) / (innerHeight * 0.74));
+}
+
+function showTarget(x: number, y: number) {
+  if (!pdfViewer.pdfDocument) return;
+  const destination = pageAtPosition(widePosition(y), pdfViewer.pagesCount);
+  scrollTarget.textContent = `Seite ${destination}`;
+  scrollTarget.hidden = false;
+  const r = scroller.getBoundingClientRect();
+  scrollTarget.style.left = Math.max(8, Math.min(x - 14, r.left - 12) - scrollTarget.offsetWidth) + "px";
+  scrollTarget.style.top = Math.max(8, Math.min(innerHeight - scrollTarget.offsetHeight - 8, y - scrollTarget.offsetHeight / 2)) + "px";
+}
+
+function collapseScroller() {
   window.clearTimeout(wideTimer);
   window.clearTimeout(leaveTimer);
+  scroller.classList.remove("wide");
+  scrollTarget.hidden = true;
+  stopAuto();
+}
+
+scroller.addEventListener("pointerenter", (e) => {
+  if (dragging || document.body.classList.contains("bare")) return;
+  lastPointer = { x: e.clientX, y: e.clientY };
+  window.clearTimeout(wideTimer);
+  window.clearTimeout(leaveTimer);
+  if (scroller.classList.contains("wide")) { showTarget(e.clientX, e.clientY); return; }
   // Erst nach einer Sekunde Verweilen - sonst schnappt der Stab zu, wenn
   // die Maus nur vorbeizieht.
   wideTimer = window.setTimeout(() => {
     scroller.classList.add("wide");
-    startAuto();
+    if (lastPointer) showTarget(lastPointer.x, lastPointer.y);
   }, 1000);
 });
 
@@ -803,19 +830,25 @@ scroller.addEventListener("pointerleave", () => {
   if (dragging) return;
   window.clearTimeout(wideTimer);
   window.clearTimeout(leaveTimer);
+  stopAuto();
+  scrollTarget.hidden = true;
   // Noch eine Sekunde stehen lassen - wer nur kurz danebengreift, soll
   // nicht sofort aus dem Scrollfeld fallen.
   leaveTimer = window.setTimeout(() => {
-    scroller.classList.remove("wide");
-    stopAuto();
+    collapseScroller();
   }, 1000);
 });
 
 scroller.addEventListener("pointermove", (e) => {
+  lastPointer = { x: e.clientX, y: e.clientY };
   if (!scroller.classList.contains("wide") || dragging) return;
-  const r = scroller.getBoundingClientRect();
-  const t = (e.clientY - r.y) / Math.max(1, r.height);
-  zone = Math.min(4, Math.max(0, Math.floor(t * 5)));
+  showTarget(e.clientX, e.clientY);
+  const nextSpeed = speedAtPosition(widePosition(e.clientY));
+  if (!nextSpeed) { stopAuto(); return; }
+  // Direction changes must not briefly continue in the old direction.
+  if (Math.sign(nextSpeed) !== Math.sign(currentSpeed)) currentSpeed = 0;
+  targetSpeed = nextSpeed;
+  startAuto();
 });
 
 // Deckt sich mit dem Rand in styles.css (#scroller top: calc(...)).
@@ -824,6 +857,17 @@ const TRACK_MARGIN = 84;
 /** Ziehen setzt die Leseposition direkt, wie bei einer echten
  *  Bildlaufleiste: die Stelle im Fenster ist die Stelle im Dokument. */
 function scrubTo(e: PointerEvent) {
+  if (press?.wide) {
+    const position = widePosition(e.clientY);
+    const pageNumber = pageAtPosition(position, pdfViewer.pagesCount);
+    const view = pdfViewer.getPageView(pageNumber - 1);
+    if (view) {
+      const fraction = position === 1 ? 1 : position * pdfViewer.pagesCount - (pageNumber - 1);
+      container.scrollTop = view.div.offsetTop + view.div.clientHeight * fraction;
+    }
+    showTarget(e.clientX, e.clientY);
+    return;
+  }
   const usable = Math.max(1, window.innerHeight - TRACK_MARGIN * 2);
   const t = Math.min(1, Math.max(0, (e.clientY - TRACK_MARGIN) / usable));
   const max = container.scrollHeight - container.clientHeight;
@@ -834,27 +878,48 @@ scroller.addEventListener("pointerdown", (e) => {
   if (e.button !== 0) return;
   e.preventDefault();
   dragging = true;
+  press = { x: e.clientX, y: e.clientY, wide: scroller.classList.contains("wide"), moved: false, pointerId: e.pointerId };
   window.clearTimeout(wideTimer);
-  scroller.classList.remove("wide");
+  window.clearTimeout(leaveTimer);
   stopAuto();
-  scroller.classList.add("dragging");
+  if (!press.wide) scroller.classList.add("dragging");
   scroller.setPointerCapture(e.pointerId);
-  scrubTo(e);
+  if (!press.wide) scrubTo(e);
 });
 
 window.addEventListener("pointermove", (e) => {
-  if (dragging) scrubTo(e);
+  if (!dragging || !press || e.pointerId !== press.pointerId) return;
+  if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > 4) press.moved = true;
+  if (press.moved) scrubTo(e);
 });
 
 function endDrag(e: PointerEvent) {
   if (!dragging) return;
+  if (press && e.pointerId !== press.pointerId) return;
+  if (press?.wide && !press.moved && e.type === "pointerup") {
+    pdfViewer.currentPageNumber = pageAtPosition(widePosition(press.y), pdfViewer.pagesCount);
+  }
   dragging = false;
+  press = null;
   scroller.classList.remove("dragging");
   try { scroller.releasePointerCapture(e.pointerId); } catch { /* schon los */ }
+  if (!scroller.matches(":hover")) collapseScroller();
 }
 
 window.addEventListener("pointerup", endDrag);
 window.addEventListener("pointercancel", endDrag);
+
+function suspendScrolling() {
+  const pointerId = press?.pointerId;
+  dragging = false; press = null;
+  scroller.classList.remove("dragging");
+  if (pointerId !== undefined && scroller.hasPointerCapture(pointerId)) scroller.releasePointerCapture(pointerId);
+  collapseScroller();
+}
+window.addEventListener("blur", suspendScrolling);
+scroller.addEventListener("lostpointercapture", () => { if (dragging) suspendScrolling(); });
+window.addEventListener("resize", suspendScrolling);
+document.addEventListener("visibilitychange", () => { if (document.hidden) suspendScrolling(); });
 
 // ---------- Tastatur ----------
 
@@ -864,7 +929,7 @@ window.addEventListener("keydown", (e) => {
   const ctrl = e.ctrlKey || e.metaKey;
   const k = e.key.toLowerCase();
 
-  if (e.key === "F11") { e.preventDefault(); document.body.classList.toggle("bare"); return; }
+  if (e.key === "F11") { e.preventDefault(); suspendScrolling(); document.body.classList.toggle("bare"); return; }
   if (reader.hidden) {
     if (ctrl && k === "o") { e.preventDefault(); void pick(); }
     return;

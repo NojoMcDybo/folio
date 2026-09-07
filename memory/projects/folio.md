@@ -14,9 +14,11 @@ Phase 1 (0.3.0): Page chip reappears and persists on hover. Shared inversion fil
 - Neutral #202020 reading background, quieter library, blue UI accent, distinct broad highlighter and general toolbox opener. See `DESIGN.md`.
 - Installed 0.2.0 update and desktop shortcut verified; original executable, shortcut, and PDF association unchanged. Existing test-library entries visible after update.
 - Production browser UI checks passed at 100/125/200% scaling. Native start/library checked; further native input stopped when user activity was detected.
-- Destination-page labels, scroll-speed changes, chapter access and library/file deletion are still pending. Inversion is now softened in 0.3.0; user-document colour feedback may require further tuning.
+- Chapter access and library/file deletion are still pending. Target-page labels and continuous scrolling have a first implementation in 0.4.0. Inversion is softened since 0.3.0; user-document colour feedback may require further tuning.
 
 ## User requests
+
+0.4.0: User requested implementing/refining scroll navigation. First trial uses target page label next to cursor, retained hover auto-scroll, click-to-jump/pause, and continuous quadratic speed with a 16% central stop zone. The optional gesture question remains unanswered; this is the assistant's stated test assumption, not an explicitly selected user preference. Navigation tests passed with 3/60 pages, varied page heights and small windows. Chapter access and library deletion remain pending.
 
 0.3.2: User requested stronger refraction in the expanded automatic scrollbar. Implemented with broader edge refraction and white progress core, tested and installed in Folio Test only.
 

@@ -1,5 +1,7 @@
 # Folio Test
 
+Neuester Stand: **0.4.0** installiert, mit Zielseitenanzeige, Klicksprung/Pause und stufenlosem Autoscroll. Frontend-/Release-Build, `npm run test:scroll` und Browserpruefungen bestanden (3/60 Seiten, unterschiedliche Hoehen, kleines Fenster, beide Ziehgesten, Stoppen/Fokus/F11 und bestehende UI). Installierte Datei, Desktop-Ziel und unveraendertes Original verifiziert; native Bedienpruefung der neuen Navigation steht beim Benutzer aus. Installer-SHA256: `B633EB9AE637961421F40052A7ACD7519681345E8A03E62DF889029DD5D7AACD`.
+
 Aktuell installiert: **0.3.2** mit staerkerer Lichtbrechung in der grossen Autoscroll-Leiste. Build und Browserpruefung erfolgreich; Installation/Binaerdatei/Desktop-Verknuepfung verifiziert, Original unveraendert. Installer-SHA256: `A6666536A8B561B7FF549B578EF20608318D0A3BC9805795F384BFF9C481EAD9`.
 
 Neuestes Update: **0.3.1** installiert, mit adaptivem Scrollleistenkontrast und reinweisser Fortschrittsfuellung. Frontend-/Release-Build sowie Browserpruefung und Sichtpruefung beider Groessen auf hellen/dunklen Flaechen erfolgreich. Installierte Datei und Desktop-Ziel verifiziert; Original-App, Original-Verknuepfung und PDF-Dateizuordnung unveraendert. Installer-SHA256: `0BC3F2F65F8A25052C606D961E2E0F33FFDD2602962311149ABC5F8F8FA81BC8`.

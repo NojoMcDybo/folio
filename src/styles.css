@@ -152,7 +152,7 @@ body.no-gl #glasslayer { display: none; }
   /* Kein fester Punkt in der Bildschirmmitte - der Griff wandert wie bei
      einer normalen Bildlaufleiste mit dem Lesefortschritt zwischen den
      Randabstaenden oben und unten. Erst beim Hovern (s. main.ts) schnappt
-     er fuer die vollen fuenf Geschwindigkeitsfelder in die Mitte. */
+     er fuer die stufenlose Geschwindigkeitssteuerung in die Mitte. */
   top: calc(84px + var(--scroller-p) * (100% - 168px));
   right: 13px;
   translate: 0 -50%;
@@ -173,8 +173,7 @@ body.no-gl #glasslayer { display: none; }
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.32), 0 0 24px rgba(255, 255, 255, 0.14);
   top: 50%;
   width: 28px;
-  /* Fuenf Geschwindigkeitsfelder brauchen Platz je Feld, sonst sind die
-     langsamen Stufen kaum zu treffen. */
+  /* Viel Platz fuer langsames Lesen und eine gut treffbare Ruhezone. */
   height: 74vh;
   right: 16px;
 }
@@ -191,6 +190,28 @@ body.no-gl #scroller { background: rgba(255, 255, 255, 0.65); }
 
 #scroller.glass--light {
   box-shadow: 0 0 0 1px rgba(35, 35, 38, 0.5), 0 2px 9px rgba(0, 0, 0, 0.28), 0 0 3px rgba(255, 255, 255, 0.18);
+}
+
+#scroll-target {
+  padding: 7px 11px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 45;
+}
+
+#scroller.wide::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  right: 8px;
+  height: 1px;
+  background: var(--glass-ink);
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 /* Lupe: der Suchknopf wird beim Ziehen ueber die Seite dazu. Der Ring

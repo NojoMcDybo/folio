@@ -13,9 +13,11 @@ Umgesetzt in 0.3.0: Hover-Seitenzahl, gemeinsame weniger gesaettigte Invertierun
 
 ## 2. Scrollnavigation zusammen ueberarbeiten
 
+Erste Testvariante in 0.4.0 umgesetzt: Hover zeigt die physische Zielseitenzahl und steuert weiterhin Autoscroll. Klick springt zur angezeigten Seite und pausiert bis zur naechsten Bewegung. Grosse Leiste bleibt beim Ziehen gross; kleine Leiste behaelt direktes Ziehen zur Scrollposition. Stufenlose Kurve statt fuenf Feldern, 16 Prozent Ruhezone, sanftes Beschleunigen und sofortiges Stoppen beim Verlassen. Bediengefuehl anschliessend mit dem Benutzer abstimmen.
+
 - Zielseitenzahl neben dem Mauszeiger an der grossen Leiste zeigen, ohne Vorschaubild; Position oben entspricht fruehen Seiten.
 - Automatisches Scrollen feiner abstufen, mit gut treffbarer Ruhezone in der Mitte. Mehr Geschwindigkeitsstufen gegen eine kontinuierliche Kurve im Test vergleichen.
-- Vor Umsetzung festlegen, wie Zielseitenwahl und bestehendes Hover-Autoscrollen zusammenarbeiten. Vorschlag: Hover zeigt die Zielseite, Klick springt; das darf die bestehende Autoscroll-Funktion nicht stillschweigend ersetzen.
+- Erste Variante: Hover zeigt die Zielseite und steuert Autoscroll; Klick springt und pausiert. Die Funktion wurde als Testvorschlag umgesetzt, die optionale Rueckfrage zur bevorzugten Geste blieb bisher unbeantwortet.
 - Mit kurzen und langen PDFs pruefen: erste/letzte Seite, Richtungswechsel, Stoppen, Ziehen und verschiedene Fenstergroessen.
 
 ## 3. Kapitelzugriff

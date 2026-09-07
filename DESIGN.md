@@ -33,6 +33,14 @@ Referenz: [Apple: Meet Liquid Glass](https://developer.apple.com/videos/play/wwd
 
 ## Bedienelemente
 
+### Scrollnavigation 0.4.0
+
+- Die grosse Leiste zeigt `Seite N` links neben dem Cursor, ohne Vorschaubild. Gleiche Zielbereiche pro physischer PDF-Seite; erste und letzte Seite sind enthalten, unabhaengig von der aktuellen Scrollposition oder unterschiedlichen Seitenhoehen.
+- Hover steuert weiter Autoscroll. Klick springt zur angezeigten Seite und stoppt bis zur naechsten Mausbewegung. Ziehen der grossen Leiste folgt den Zielseiten kontinuierlich, ohne zum schmalen Griff zusammenzuklappen. Der schmale Griff behaelt die direkte Positionssteuerung.
+- Mittlere 16 Prozent sind Ruhezone, gekennzeichnet durch einen feinen Mittelstrich. Ausserhalb quadratische Geschwindigkeitskurve von sehr langsam bis maximal 1600 Pixel/Sekunde je Richtung. Beschleunigung wird zeitbasiert geglaettet; Ruhezone, Pointerleave, F11, Fokusverlust und ausgeblendetes Fenster stoppen sofort. Nach Verlassen bleibt die breite Form eine Sekunde sichtbar.
+- Tooltip bleibt innerhalb des Fensters, blockiert keine Mausinteraktion und verwendet den vorhandenen adaptiven Glaskontrast.
+- Pruefung: automatisierte Kurven-/Seitenbereichstests (`npm run test:scroll`, aktueller Node mit TypeScript-Stripping); Browser mit echter 60-Seiten-PDF inklusive unterschiedlicher Hoehen sowie 3-Seiten-PDF im 520x400-Fenster. Seite 13, erste/letzte Seite, Klickpause, Wiederaufnahme, Mitte, Richtungswechsel, Verlassen, beide Ziehgesten, F11 und Fokusverlust bestanden. Bestehende UI-Pruefung separat ausgefuehrt.
+
 Version 0.3.2: Staerkere Lichtbrechung ausschliesslich beim Aufklappen der Autoscroll-Leiste. Brechungsweg von 3,5 auf 11 CSS-Pixel, breiterer optischer Rand; Staerke folgt kontinuierlich der aktuellen Leistenbreite. Die Fortschrittsmitte bleibt weiss, ihr Rand laesst die Brechung durchscheinen. Browser-Sichtpruefung ueber PDF-Text und Seitenraendern sowie bestehende UI-Pruefungen erfolgreich.
 
 Version 0.3.1: Fortschritt in beiden Scrollleistengroessen ist rein weiss. Auf hellem Hintergrund ergaenzt die Helligkeitserkennung dunkle Kontur und Schatten; die ungefuellte Restflaeche wird dezent grau. Hysterese und weiche Uebergaenge stabilisieren den Wechsel. Beide Groessen auf weissem und dunklem Hintergrund im Browser visuell geprueft; WebGL und vorhandene UI-Pruefungen ohne Fehler.
@@ -53,7 +61,7 @@ Version 0.3.1: Fortschritt in beiden Scrollleistengroessen ist rein weiss. Auf h
 - Gemeinsame CSS-Variable fuer Invertierung in PDF, Lupe und Glas: bestehende Umwandlung plus `saturate(0.65)`. Das mindert auch andere Farbstiche und kraeftige Farben. Graustufen bleiben neutral. Keine Behauptung, die Ursache des benutzerspezifischen Violettstichs sei bereits nachgewiesen.
 - Browserpruefung mit echter Test-PDF: Hover nach Ausblendung und ueber Timeout hinaus, F11 waehrend Hover, Vergroessern/Rueckkehr, Fensteranpassung, Wortauswahl, Zeichenmodus. Farbprobe: graue Kanaele 94/94/94; Kanalspreizung leicht getoenter Probe von 8 auf 5 reduziert; Rot weiterhin erkennbar.
 
-Keine neue Kapitel-/Seiten-Navigation, keine Loeschfunktion und keine Aenderung der Scrollgeschwindigkeiten. Der violette UI-Akzent wurde durch Blau ersetzt.
+Kapitelzugriff und Loeschfunktion sind weiterhin offen. Zielseitenwahl und Scrollgeschwindigkeiten wurden mit 0.4.0 ergaenzt. Der violette UI-Akzent wurde durch Blau ersetzt.
 
 ## Pruefung
 
