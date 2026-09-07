@@ -4,6 +4,8 @@ Recorded 2026-09-06; updated 2026-09-07. User approved the first Folio Test tria
 
 ## Implemented in the copy: Folio Test 0.2.0
 
+Follow-up: User likes this visual direction. Requested a short work plan (now `ARBEITSPLAN.md`) and brighter white glow for both scrollbar sizes (0.2.1).
+
 - Worktree `D:\Dev\folio-test`, branch `codex/apple-ui`; first trial checkpoint `2838df9`. No remote push or merge to main.
 - Lens now 160px inside / 194px outside, unchanged 2.5x magnification.
 - Glass rebuilt with bounded refraction, antialiased edges, neutral sheen, no dark tint or RGB splitting; crisp SVG icons adapt to light/dark backdrop.

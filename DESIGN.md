@@ -38,6 +38,7 @@ Referenz: [Apple: Meet Liquid Glass](https://developer.apple.com/videos/play/wwd
 - Buttons haben zugaengliche Namen, Werkzeugauswahl aria-pressed, Menueoeffner aria-expanded, Suchfeld einen Namen und Platzhalter. Sichtbarer Tastaturfokus.
 - Freies Verschieben und Tastaturkuerzel bleiben erhalten. Positionsbegrenzung haelt Bedienelemente nach dem Verkleinern erreichbar.
 - F11 blendet auch die gesamte offene Werkzeuggruppe aus.
+- Version 0.2.1: Kleine und ausgeklappte Scrollleiste haben auf Benutzerwunsch eine hellere, neutralweisse Glasflaeche und einen weichen weissen Schein. Der Fortschritt bleibt durch eine weitere Aufhellung unterscheidbar.
 
 ## Grenzen dieser Runde
 

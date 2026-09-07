@@ -62,7 +62,9 @@ void main() {
   if (uFill >= 0.0) {
     float y = (frag.y - uRect.y) / uRect.w;
     float fill = 1.0 - smoothstep(uFill - 0.01, uFill + 0.01, y);
-    col = mix(col, vec3(0.70, 0.84, 1.0), 0.24 * fill);
+    // Both scrollbar sizes use a luminous neutral white material.
+    col = mix(col, vec3(1.0), 0.34 + 0.10 * uHover);
+    col = mix(col, vec3(1.0), 0.32 * fill);
   }
   outColor = vec4(col, coverage * uOpacity);
 }`;

@@ -1,5 +1,7 @@
 # Folio Test
 
+Aktuelles Update: **0.2.1** mit helleren weissen Scrollleisten installiert. Frontend-/Release-Build und Browserpruefung einschliesslich Hover-Aufklappen erfolgreich; beide Groessen visuell geprueft. Installierte Datei gegen Build und Desktop-Ziel geprueft, Original-App/Verknuepfung/PDF-Zuordnung unveraendert. Installer-SHA256: `07BE9E2A6BD52DFAECEE702CE4142D349DFFAC58D6E410E754514A6DEB1C4407`.
+
 Diese Arbeitskopie prueft den Weg von einer kleinen Aenderung zur installierten Windows-App.
 
 ## Ausgangsstand

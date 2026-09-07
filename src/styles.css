@@ -147,6 +147,7 @@ body.no-gl #glasslayer { display: none; }
    schnell hoch, unten schnell runter, in der Mitte Ruhe. */
 #scroller {
   --scroller-p: 0.5;
+  box-shadow: 0 0 7px rgba(255, 255, 255, 0.28), 0 0 18px rgba(255, 255, 255, 0.12);
   /* Kein fester Punkt in der Bildschirmmitte - der Griff wandert wie bei
      einer normalen Bildlaufleiste mit dem Lesefortschritt zwischen den
      Randabstaenden oben und unten. Erst beim Hovern (s. main.ts) schnappt
@@ -167,6 +168,7 @@ body.no-gl #glasslayer { display: none; }
 }
 
 #scroller.wide {
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.32), 0 0 24px rgba(255, 255, 255, 0.14);
   top: 50%;
   width: 28px;
   /* Fuenf Geschwindigkeitsfelder brauchen Platz je Feld, sonst sind die
@@ -182,6 +184,8 @@ body.no-gl #glasslayer { display: none; }
      folgen, nicht ihr hinterher-eiern. */
   transition: width 0.15s var(--ease);
 }
+
+body.no-gl #scroller { background: rgba(255, 255, 255, 0.65); }
 
 /* Lupe: der Suchknopf wird beim Ziehen ueber die Seite dazu. Der Ring
    bleibt normales Glas (GlassLayer malt dort die Kuppel wie ueberall
