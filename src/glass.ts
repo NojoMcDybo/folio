@@ -15,7 +15,7 @@ precision highp float;
 uniform sampler2D uBack;
 uniform vec2 uRes, uTexel;
 uniform vec4 uRect;
-uniform float uRadius, uScale, uOpacity, uHover, uPanel, uFill, uLight;
+uniform float uRadius, uScale, uOpacity, uHover, uPanel, uFill, uLight, uWideScroll;
 out vec4 outColor;
 float sdf(vec2 p, vec2 b, float r) {
   vec2 q = abs(p) - b + r;
@@ -41,7 +41,8 @@ void main() {
   float edge = 1.0 - smoothstep(0.0, max(1.0, edgeWidth), depth);
   // Bounded refraction without the old rainbow fringe.
   vec2 uv = frag / uRes;
-  vec2 offset = -normal * edge * edge * (3.5 + 0.6 * uHover) * uScale / uRes;
+  float refraction = mix(3.5, 11.0, uWideScroll) + 0.6 * uHover;
+  vec2 offset = -normal * pow(edge, mix(2.0, 1.25, uWideScroll)) * refraction * uScale / uRes;
   vec2 sampleUV = uv + offset;
   vec3 clear = texture(uBack, sampleUV).rgb;
   vec2 stepUV = uTexel * mix(1.6, 9.0, uPanel);
@@ -66,7 +67,8 @@ void main() {
     col = mix(col, vec3(1.0), 0.34 + 0.10 * uHover);
     // A light backdrop needs a grey track so the white progress stays readable.
     col = mix(col, vec3(0.55), 0.65 * uLight);
-    col = mix(col, vec3(1.0), fill);
+    // Keep a white progress core while leaving the expanded optical rim visible.
+    col = mix(col, vec3(1.0), fill * (1.0 - 0.38 * uWideScroll * edge));
   }
   outColor = vec4(col, coverage * uOpacity);
 }`;
@@ -244,6 +246,7 @@ export class GlassLayer {
       gl.uniform1f(this.uniform("uPanel"), el.dataset.glass === "panel" ? 1 : 0);
       gl.uniform1f(this.uniform("uFill"), el.dataset.fill === undefined ? -1 : Number(el.dataset.fill));
       gl.uniform1f(this.uniform("uLight"), light);
+      gl.uniform1f(this.uniform("uWideScroll"), el.id === "scroller" ? Math.max(0, Math.min(1, (r.width - 9) / 19)) : 0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
   };

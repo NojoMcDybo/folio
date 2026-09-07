@@ -33,6 +33,8 @@ Referenz: [Apple: Meet Liquid Glass](https://developer.apple.com/videos/play/wwd
 
 ## Bedienelemente
 
+Version 0.3.2: Staerkere Lichtbrechung ausschliesslich beim Aufklappen der Autoscroll-Leiste. Brechungsweg von 3,5 auf 11 CSS-Pixel, breiterer optischer Rand; Staerke folgt kontinuierlich der aktuellen Leistenbreite. Die Fortschrittsmitte bleibt weiss, ihr Rand laesst die Brechung durchscheinen. Browser-Sichtpruefung ueber PDF-Text und Seitenraendern sowie bestehende UI-Pruefungen erfolgreich.
+
 Version 0.3.1: Fortschritt in beiden Scrollleistengroessen ist rein weiss. Auf hellem Hintergrund ergaenzt die Helligkeitserkennung dunkle Kontur und Schatten; die ungefuellte Restflaeche wird dezent grau. Hysterese und weiche Uebergaenge stabilisieren den Wechsel. Beide Groessen auf weissem und dunklem Hintergrund im Browser visuell geprueft; WebGL und vorhandene UI-Pruefungen ohne Fehler.
 
 - Textmarker: breite, senkrechte Keilform mit Unterstreichung; Zeichenstift bleibt schmal und diagonal.
