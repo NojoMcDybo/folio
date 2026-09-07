@@ -22,6 +22,8 @@ Erste Testvariante in 0.4.0 umgesetzt: Hover zeigt die physische Zielseitenzahl 
 
 ## 3. Kapitelzugriff
 
+Umgesetzt in 0.5.0: Knopf links oben oeffnet das Inhaltsverzeichnis aus vorhandenen PDF-Lesezeichen. Unterkapitel sind aufklappbar, gedruckte Seitenbezeichnungen werden angezeigt. Auswahl springt zum PDF-Ziel ohne Zoomwechsel. PDFs ohne Lesezeichen erhalten einen Hinweis; defekte und externe Ziele sind deaktiviert. Zusaetzlich beginnt die Scrollkurve jetzt am Rand der Ruhezone bei null, ohne bisherigen 20-Pixel/Sekunde-Sprung.
+
 - Zuerst vorhandene PDF-Lesezeichen/Gliederung als aufklappbares Inhaltsverzeichnis nutzen.
 - Verschachtelte Kapitel und gedruckte Seitenbezeichnungen beruecksichtigen.
 - PDFs ohne strukturierte Kapitel weiterhin normal anzeigen. Das Erkennen eines nur gedruckten Inhaltsverzeichnisses ist ein spaeterer eigener Ausbau.

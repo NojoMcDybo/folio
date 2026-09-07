@@ -114,7 +114,7 @@ body.no-gl #glasslayer { display: none; }
 
 /* .ico setzt position:relative und wuerde das fixed der Glasklasse
    ueberschreiben - hier ausdruecklich zurueckholen. */
-#b-home, #b-find, #b-invert, #b-save,
+#b-home, #b-outline, #b-find, #b-invert, #b-save,
 #wincontrols, #pagechip, #anngroup, #findbar, #toast, #scroller { position: fixed; }
 
 /* Kinder einer Gruppe bleiben im Fluss, sonst bricht die Reihe. */
@@ -127,6 +127,7 @@ body.no-gl #glasslayer { display: none; }
 
 /* Einzelne Knoepfe an den Stellen, an denen man sie erwartet. */
 #b-home { top: 12px; left: 14px; }
+#b-outline { top: 12px; left: 64px; }
 #b-find { top: 12px; right: 178px; }
 #b-invert { top: 12px; right: 128px; }
 #wincontrols { top: 12px; right: 14px; border-radius: 17px; }
@@ -200,6 +201,67 @@ body.no-gl #scroller { background: rgba(255, 255, 255, 0.65); }
   white-space: nowrap;
   pointer-events: none;
   z-index: 45;
+}
+
+/* A readable chapter panel above the document, with native disclosure buttons. */
+#outline-panel {
+  position: fixed;
+  z-index: 60;
+  top: 64px;
+  left: 14px;
+  width: min(320px, calc(100vw - 28px));
+  max-height: calc(100vh - 140px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #76767a transparent;
+  border-radius: 20px;
+  background: rgba(34, 34, 37, 0.97);
+  backdrop-filter: blur(16px);
+  color: var(--ink);
+  box-shadow: 0 12px 36px #0005, inset 0 0 0 1px #ffffff24;
+  padding: 0 8px 10px;
+}
+.outline-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 6px 10px;
+  background: #222225;
+}
+.outline-header h2 { margin: 0; font-size: 15px; font-weight: 600; }
+#outline-status { color: var(--dim); margin: 8px 10px 12px; line-height: 1.6; }
+#outline-list ul { list-style: none; margin: 0; padding: 0; }
+.outline-row { display: flex; align-items: flex-start; gap: 2px; }
+.outline-branch { flex: 0 0 24px; width: 24px; height: 36px; border: 0; border-radius: 8px; background: transparent; font-size: 23px; }
+.outline-branch[aria-expanded=true] { transform: rotate(90deg); }
+.outline-branch:hover { background: #ffffff12; }
+.outline-link {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 9px 10px;
+  text-align: left;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 12px;
+}
+.outline-link:hover { background: #ffffff12; }
+.outline-link[aria-current=location] { color: #a5d0ff; background: #75b8ff20; }
+.outline-link:disabled { color: var(--dim); cursor: default; }
+.outline-title { flex: 1; overflow-wrap: anywhere; }
+.outline-page { flex-shrink: 0; color: var(--dim); font-variant-numeric: tabular-nums; font-size: 11px; }
+@media (forced-colors: active) {
+  #outline-panel, .outline-header { background: Canvas; color: CanvasText; }
+  #outline-panel { border: 1px solid ButtonText; }
 }
 
 #scroller.wide::after {

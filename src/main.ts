@@ -10,6 +10,7 @@ import "pdfjs-dist/web/pdf_viewer.css";
 import "./styles.css"; // muss nach pdf_viewer.css kommen
 import { GlassLayer } from "./glass";
 import { clampPosition, pageAtPosition, speedAtPosition } from "./scroll-navigation";
+import { OutlinePanel } from "./outline";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -58,6 +59,8 @@ const P = (d: string) =>
 
 const ICON: Record<string, string> = {
   "b-home": P('<path d="M14.5 5 8 12l6.5 7"/>'),
+  "b-outline": P('<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v16M12 8h5M12 12h5M12 16h3"/>'),
+  "outline-close": P('<path d="M7 7l10 10M17 7 7 17"/>'),
   "b-find": P('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>'),
   "b-invert": P('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" stroke="none"/>'),
   "b-save": P('<path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 19h14"/>'),
@@ -256,6 +259,15 @@ linkService.setViewer(pdfViewer);
 let currentPath: string | null = null;
 let pendingPage = 1;
 let dirty = false;
+const outlinePanel = new OutlinePanel(
+  $<HTMLElement>("outline-panel"), $<HTMLButtonElement>("b-outline"),
+  $<HTMLElement>("outline-list"), $<HTMLElement>("outline-status"), $<HTMLButtonElement>("outline-close"),
+  ({ pageNumber, destination }) => {
+    suspendScrolling();
+    pdfViewer.scrollPageIntoView({ pageNumber, destArray: destination, ignoreDestinationZoom: true });
+  },
+  () => suspendScrolling(),
+);
 let zoomBeforeFit: number | null = null;
 
 function fitOpen() {
@@ -326,6 +338,7 @@ eventBus.on("pagesinit", () => {
 });
 
 eventBus.on("pagechanging", (e: { pageNumber: number }) => {
+  outlinePanel.setCurrentPage(e.pageNumber);
   flashChip(e.pageNumber + " / " + pdfViewer.pagesCount);
   if (currentPath) {
     touchRecent({ path: currentPath, page: e.pageNumber, pages: pdfViewer.pagesCount });
@@ -380,6 +393,7 @@ async function openPath(path: string) {
     const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
     pdfViewer.setDocument(doc);
     linkService.setDocument(doc, null);
+    outlinePanel.setDocument(doc);
 
     const storage = doc.annotationStorage as unknown as {
       onSetModified: (() => void) | null;
@@ -929,7 +943,7 @@ window.addEventListener("keydown", (e) => {
   const ctrl = e.ctrlKey || e.metaKey;
   const k = e.key.toLowerCase();
 
-  if (e.key === "F11") { e.preventDefault(); suspendScrolling(); document.body.classList.toggle("bare"); return; }
+  if (e.key === "F11") { e.preventDefault(); suspendScrolling(); outlinePanel.close(); document.body.classList.toggle("bare"); return; }
   if (reader.hidden) {
     if (ctrl && k === "o") { e.preventDefault(); void pick(); }
     return;
@@ -943,6 +957,7 @@ window.addEventListener("keydown", (e) => {
   else if (e.key === "F3") { e.preventDefault(); dispatchFind(true, e.shiftKey); }
   else if (e.key === "Escape") {
     if (!findbar.hidden) { e.preventDefault(); closeFind(); }
+    else if (!$<HTMLElement>("outline-panel").hidden) { e.preventDefault(); outlinePanel.close(true); }
     else if (anngroup.classList.contains("open")) { e.preventDefault(); closeAnn(); }
   }
   else if (!ctrl && !typing) {

@@ -17,6 +17,10 @@ test('speed has a broad stop zone, symmetric directions and gradual acceleration
   assert.equal(speedAtPosition(0), -1600);
   assert.equal(speedAtPosition(1), 1600);
   assert.ok(speedAtPosition(.6) < 30);
+  assert.ok(Math.abs(speedAtPosition(.419999)) < 0.000001);
+  assert.ok(Math.abs(speedAtPosition(.580001)) < 0.000001);
+  // Halfway from the stop-zone boundary to the edge means quarter speed.
+  assert.ok(Math.abs(speedAtPosition(.79) - 400) < 0.0001);
   let previous = 0;
   for (let i = 59; i <= 100; i++) {
     const speed = speedAtPosition(i / 100);

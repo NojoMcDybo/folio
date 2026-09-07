@@ -12,5 +12,5 @@ export function speedAtPosition(position: number): number {
   const distance = clamped * 2 - 1;
   const magnitude = Math.abs(distance);
   const ramp = (magnitude - 0.16) / 0.84;
-  return Math.sign(distance) * (20 + 1580 * ramp * ramp);
+  return Math.sign(distance) * 1600 * ramp * ramp;
 }

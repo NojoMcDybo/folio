@@ -1,5 +1,7 @@
 # Folio Test
 
+Neuester Stand: **0.5.0** installiert. Scrollkurve startet ohne festen Mindestwert direkt ausserhalb der Ruhezone bei null. Kapitelpanel fuer vorhandene PDF-Lesezeichen inklusive Unterkapiteln, benannten Zielen und Seitenbezeichnungen. Frontend-/Release-Build, Scrollkurven-/Navigationspruefungen, Kapitelpruefungen mit echten PDF-Fixtures sowie bestehende UI-Pruefung bestanden. Installation/Binaerdatei/Desktop-Ziel verifiziert; Original-App und Verknuepfung unveraendert. Die native Bedienpruefung der neuen Funktionen steht beim Benutzer aus. Installer-SHA256: `8CC93F0CA92B2E229C8253DA6C1E113983AE8B01A706F26A8A012DCD113CAECC`.
+
 Neuester Stand: **0.4.0** installiert, mit Zielseitenanzeige, Klicksprung/Pause und stufenlosem Autoscroll. Frontend-/Release-Build, `npm run test:scroll` und Browserpruefungen bestanden (3/60 Seiten, unterschiedliche Hoehen, kleines Fenster, beide Ziehgesten, Stoppen/Fokus/F11 und bestehende UI). Installierte Datei, Desktop-Ziel und unveraendertes Original verifiziert; native Bedienpruefung der neuen Navigation steht beim Benutzer aus. Installer-SHA256: `B633EB9AE637961421F40052A7ACD7519681345E8A03E62DF889029DD5D7AACD`.
 
 Aktuell installiert: **0.3.2** mit staerkerer Lichtbrechung in der grossen Autoscroll-Leiste. Build und Browserpruefung erfolgreich; Installation/Binaerdatei/Desktop-Verknuepfung verifiziert, Original unveraendert. Installer-SHA256: `A6666536A8B561B7FF549B578EF20608318D0A3BC9805795F384BFF9C481EAD9`.

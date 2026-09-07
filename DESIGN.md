@@ -33,6 +33,15 @@ Referenz: [Apple: Meet Liquid Glass](https://developer.apple.com/videos/play/wwd
 
 ## Bedienelemente
 
+### Kapitelzugriff und Scrollkorrektur 0.5.0
+
+- Inhaltsverzeichnis-Knopf links neben den Lesebedienelementen. Lesbares dunkles Panel mit verschachtelten Listen, separaten Aufklappknoepfen und Seitenbezeichnungen. Unterkapitel starten eingeklappt; aktives Kapitel wird anhand der Leseseite hervorgehoben.
+- Unterstuetzt direkte sowie benannte PDF-Ziele und Seitenreferenzen. Der PDF-Zielpunkt wird verwendet, die aktuelle Zoomstufe bleibt erhalten. Externe Lesezeichen werden nicht als Kapitel geoeffnet; fehlende Ziele bleiben deaktiviert.
+- Metadaten werden erst beim Oeffnen geladen, Zielaufloesung mit maximal vier parallelen Auftraegen. Veraltete Ergebnisse nach Dokumentwechsel sowie ueberholte schnelle Klicks werden verworfen. Lesezeichentitel werden ausschliesslich als Text eingefuegt.
+- Escape und Schliessknopf geben Fokus an den Oeffner zurueck; F11 schliesst das Panel. Auf kleinen Fenstern schliesst es nach Auswahl eines Kapitels. PDFs ohne Gliederung erhalten einen Hinweis; gedruckte Inhaltsseiten werden nicht automatisch interpretiert.
+- Scrollgeschwindigkeit startet ausserhalb der mittleren Ruhezone bei null. Die verbleibende Strecke bis zum Rand wird auf 0..1 normiert, quadratisch auf maximal 1600 Pixel/Sekunde abgebildet. Der bisherige feste Startwert 20 entfaellt; Grenzwerte und Viertelgeschwindigkeit auf halber Strecke sind getestet.
+- Pruefung: echte PDF mit Hierarchie, benannten Zielen, roemischen/arabischen Seitenbezeichnungen, ungueltigem und externem Ziel sowie HTML-aehnlichem Titel. Kapitelziele, Zoomerhalt, Tastaturbedienung, kleines Fenster und leere Gliederung bestanden; bisherige Scroll-/UI-Pruefungen ebenfalls erfolgreich.
+
 ### Scrollnavigation 0.4.0
 
 - Die grosse Leiste zeigt `Seite N` links neben dem Cursor, ohne Vorschaubild. Gleiche Zielbereiche pro physischer PDF-Seite; erste und letzte Seite sind enthalten, unabhaengig von der aktuellen Scrollposition oder unterschiedlichen Seitenhoehen.
@@ -61,7 +70,7 @@ Version 0.3.1: Fortschritt in beiden Scrollleistengroessen ist rein weiss. Auf h
 - Gemeinsame CSS-Variable fuer Invertierung in PDF, Lupe und Glas: bestehende Umwandlung plus `saturate(0.65)`. Das mindert auch andere Farbstiche und kraeftige Farben. Graustufen bleiben neutral. Keine Behauptung, die Ursache des benutzerspezifischen Violettstichs sei bereits nachgewiesen.
 - Browserpruefung mit echter Test-PDF: Hover nach Ausblendung und ueber Timeout hinaus, F11 waehrend Hover, Vergroessern/Rueckkehr, Fensteranpassung, Wortauswahl, Zeichenmodus. Farbprobe: graue Kanaele 94/94/94; Kanalspreizung leicht getoenter Probe von 8 auf 5 reduziert; Rot weiterhin erkennbar.
 
-Kapitelzugriff und Loeschfunktion sind weiterhin offen. Zielseitenwahl und Scrollgeschwindigkeiten wurden mit 0.4.0 ergaenzt. Der violette UI-Akzent wurde durch Blau ersetzt.
+Bibliotheks-/Dateiloeschung und Absicherung des bestehenden Speicherfehlers sind weiterhin offen. Kapitelzugriff wurde in 0.5.0 ergaenzt. Der violette UI-Akzent wurde durch Blau ersetzt.
 
 ## Pruefung
 
