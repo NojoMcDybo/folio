@@ -12,6 +12,7 @@ import { GlassLayer } from "./glass";
 import { clampPosition, pageAtPosition, speedAtPosition } from "./scroll-navigation";
 import { OutlinePanel } from "./outline";
 import { ColorPalette } from "./color-palette";
+import { LibraryActions } from "./library-actions";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -49,7 +50,7 @@ const btnInvert = $<HTMLButtonElement>("b-invert");
 const anngroup = $<HTMLElement>("anngroup");
 const btnTool = $<HTMLButtonElement>("a-toggle");
 const toast = $<HTMLElement>("toast");
-const ask = $<HTMLElement>("ask");
+const ask = $<HTMLDialogElement>("ask");
 
 // ---------- Symbole ----------
 
@@ -93,21 +94,25 @@ const PLUS = P('<path d="M12 5v14"/><path d="M5 12h14"/>');
 const win = getCurrentWindow();
 $<HTMLButtonElement>("w-min").addEventListener("click", () => void win.minimize());
 $<HTMLButtonElement>("w-max").addEventListener("click", () => void win.toggleMaximize());
-$<HTMLButtonElement>("w-close").addEventListener("click", async () => {
-  if (IS_READER && dirty && !(await askSave())) return;
-  await win.close();
-});
+$<HTMLButtonElement>("w-close").addEventListener("click", () => void requestClose());
+void win.onCloseRequested(event => { event.preventDefault(); void requestClose(); });
 
 // ---------- Zuletzt geoeffnet ----------
 
 type Recent = { path: string; name: string; thumb: string; page: number; pages: number; at: number };
 
 const KEY = "folio.recents";
+const pathKey = (path: string) => path.replace(/\\/g, "/").toLowerCase();
+const hiddenKey = (path: string) => "folio.hidden." + encodeURIComponent(pathKey(path));
 
 function loadRecents(): Recent[] {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Recent[]) : [];
+    const data: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(data) ? data.filter((r): r is Recent =>
+      r && typeof r.path === "string" && typeof r.name === "string" &&
+      typeof r.thumb === "string" && Number.isFinite(r.page) && Number.isFinite(r.pages) &&
+      localStorage.getItem(hiddenKey(r.path)) !== "1") : [];
   } catch {
     return [];
   }
@@ -121,9 +126,15 @@ function saveRecents(list: Recent[]) {
   }
 }
 
-function touchRecent(patch: Partial<Recent> & { path: string }) {
+function touchRecent(patch: Partial<Recent> & { path: string }, opened = false) {
+  // Per-file tombstones also suppress stale writes from other open windows.
+  try {
+    if (opened) localStorage.removeItem(hiddenKey(patch.path));
+    else if (localStorage.getItem(hiddenKey(patch.path)) === "1") return;
+  } catch { /* The best-effort recents list must not affect PDF saving. */ }
   const list = loadRecents();
-  const i = list.findIndex((r) => r.path === patch.path);
+  const i = list.findIndex((r) => pathKey(r.path) === pathKey(patch.path));
+  if (i === -1 && !opened) return;
   const base: Recent =
     i === -1 ? { path: patch.path, name: "", thumb: "", page: 1, pages: 1, at: 0 } : list[i];
   const next = { ...base, ...patch, at: Date.now() };
@@ -134,7 +145,18 @@ function touchRecent(patch: Partial<Recent> & { path: string }) {
 
 // ---------- Bibliothek ----------
 
+function removeRecent(path: string) {
+  try { localStorage.setItem(hiddenKey(path), "1"); }
+  catch { say("Der Bibliothekseintrag konnte nicht entfernt werden."); return false; }
+  saveRecents(loadRecents().filter(r => pathKey(r.path) !== pathKey(path)));
+  return true;
+}
+
+const libraryActions = new LibraryActions(removeRecent,
+  path => invoke<void>("recycle_pdf", { path }), renderHome, say);
+
 function renderHome() {
+  libraryActions.closeMenu();
   grid.replaceChildren();
 
   const drop = document.createElement("button");
@@ -146,6 +168,8 @@ function renderHome() {
   grid.appendChild(drop);
 
   loadRecents().forEach((r, i) => {
+    const item = document.createElement("article");
+    item.className = "library-item";
     const t = document.createElement("button");
     t.className = "tile";
     t.title = r.path;
@@ -173,7 +197,19 @@ function renderHome() {
 
     t.append(cover, name);
     t.addEventListener("click", () => void openDoc(r.path));
-    grid.appendChild(t);
+    const actions = document.createElement("button");
+    actions.className = "library-more";
+    actions.textContent = "⋯";
+    actions.title = "Weitere Aktionen";
+    actions.setAttribute("aria-label", "Aktionen für " + r.name);
+    actions.setAttribute("aria-haspopup", "menu");
+    actions.setAttribute("aria-expanded", "false");
+    actions.addEventListener("click", () => libraryActions.show(r, actions));
+    item.addEventListener("contextmenu", event => {
+      event.preventDefault(); libraryActions.show(r, actions, { x: event.clientX, y: event.clientY });
+    });
+    item.append(t, actions);
+    grid.appendChild(item);
   });
   glass?.invalidate();
 }
@@ -400,7 +436,9 @@ async function openPath(path: string) {
       onResetModified: (() => void) | null;
     };
     storage.onSetModified = () => markDirty(true);
-    storage.onResetModified = () => markDirty(false);
+    // PDF.js resets this while serializing, before native disk writing succeeds.
+    // Only our successful save (or explicit discard) may clear Folio's dirty flag.
+    storage.onResetModified = () => {};
 
     currentPath = path;
     markDirty(false);
@@ -411,8 +449,9 @@ async function openPath(path: string) {
     refreshDrag();
     glass?.invalidate();
 
+    touchRecent({ path, name, thumb: known?.thumb ?? "", pages: doc.numPages, page: pendingPage }, true);
     const thumb = known?.thumb || (await makeThumb(doc));
-    touchRecent({ path, name, thumb, pages: doc.numPages, page: pendingPage });
+    if (thumb) touchRecent({ path, thumb });
   } catch (err) {
     say("Konnte nicht geöffnet werden: " + String(err));
   }
@@ -433,6 +472,8 @@ async function openDoc(path: string) {
   const label = labelFor(path);
   const open = await WebviewWindow.getByLabel(label);
   if (open) {
+    touchRecent({ path, name: path.split(/[\\/]/).pop() ?? path }, true);
+    if (!IS_READER) renderHome();
     await open.unminimize().catch(() => {});
     await open.setFocus();
     return;
@@ -471,20 +512,45 @@ const hex = (s: string) =>
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-async function save() {
-  if (!currentPath || !pdfViewer.pdfDocument || !dirty) return;
+let activeSave: Promise<boolean> | null = null;
+
+function save(): Promise<boolean> {
+  if (activeSave) return activeSave;
+  const job = performSave();
+  activeSave = job;
+  void job.finally(() => { if (activeSave === job) activeSave = null; });
+  return job;
+}
+
+async function performSave(): Promise<boolean> {
+  if (!currentPath || !pdfViewer.pdfDocument) return !dirty;
+  // Commit active text/ink before taking the serialization snapshot.
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  if (tool !== "none") setTool("none");
+  if (!dirty) return true;
+  const doc = pdfViewer.pdfDocument;
+  const path = currentPath;
   btnSave.disabled = true;
+  reader.inert = true;
+  suspendScrolling();
+  $<HTMLElement>("ask-error").textContent = "";
   try {
-    const bytes: Uint8Array = await pdfViewer.pdfDocument.saveDocument();
-    await invoke("save_pdf", bytes, { headers: { "x-path": hex(currentPath) } });
-    pdfViewer.pdfDocument.annotationStorage.resetModified();
+    const bytes: Uint8Array = await doc.saveDocument();
+    await invoke("save_pdf", bytes, { headers: { "x-path": hex(path) } });
+    doc.annotationStorage.resetModified();
     markDirty(false);
-    const thumb = await makeThumb(pdfViewer.pdfDocument);
-    if (thumb) touchRecent({ path: currentPath, thumb });
+    // Thumbnail failure must not turn a completed disk write into a save error.
+    void makeThumb(doc).then(thumb => { if (thumb) touchRecent({ path, thumb }); });
+    return true;
   } catch (err) {
-    say("Sichern fehlgeschlagen: " + String(err));
+    markDirty(true);
+    const message = "Sichern fehlgeschlagen: " + String(err);
+    $<HTMLElement>("ask-error").textContent = message + " Die Änderungen bleiben geöffnet.";
+    say(message);
+    return false;
   } finally {
     btnSave.disabled = false;
+    reader.inert = false;
   }
 }
 
@@ -568,34 +634,66 @@ btnSave.addEventListener("click", () => void save());
 
 /** Rueckfrage vor dem Verlassen. Liefert true, wenn weitergegangen
  *  werden darf. */
+let pendingAsk: Promise<boolean> | null = null;
 function askSave(): Promise<boolean> {
-  return new Promise((resolve) => {
+  if (pendingAsk) return pendingAsk;
+  pendingAsk = new Promise((resolve) => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const buttons = [...ask.querySelectorAll<HTMLButtonElement>("button")];
+    let busy = false;
     ask.hidden = false;
+    $<HTMLElement>("ask-error").textContent = "";
+    ask.showModal();
+    $<HTMLButtonElement>("ask-cancel").focus();
     const done = (v: boolean) => {
+      ask.close();
       ask.hidden = true;
       $<HTMLButtonElement>("ask-save").onclick = null;
       $<HTMLButtonElement>("ask-drop").onclick = null;
       $<HTMLButtonElement>("ask-cancel").onclick = null;
+      ask.oncancel = null;
+      pendingAsk = null;
+      if (previousFocus?.isConnected) previousFocus.focus();
       resolve(v);
     };
-    $<HTMLButtonElement>("ask-save").onclick = () => void save().then(() => done(true));
+    $<HTMLButtonElement>("ask-save").onclick = async () => {
+      if (busy) return;
+      busy = true;
+      buttons.forEach(button => { button.disabled = true; });
+      const ok = await save();
+      busy = false;
+      buttons.forEach(button => { button.disabled = false; });
+      if (ok) done(true);
+    };
     $<HTMLButtonElement>("ask-drop").onclick = () => { markDirty(false); done(true); };
     $<HTMLButtonElement>("ask-cancel").onclick = () => done(false);
+    ask.oncancel = event => { event.preventDefault(); if (!busy) done(false); };
   });
+  return pendingAsk;
 }
 
 /** Zurueck heisst hier: dieses Dokumentfenster zu, Bibliothek nach vorn. */
-async function leaveReader() {
-  if (dirty && !(await askSave())) return;
-  const lib = await WebviewWindow.getByLabel("main");
-  if (lib) {
-    await lib.unminimize().catch(() => {});
-    await lib.setFocus().catch(() => {});
-  }
-  await getCurrentWindow().close();
+let closing: Promise<void> | null = null;
+function requestClose(showLibrary = false): Promise<void> {
+  if (closing) return closing;
+  closing = (async () => {
+    if (IS_READER) {
+      if (activeSave && !(await activeSave)) return;
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      if (tool !== "none") setTool("none");
+      if (dirty && !(await askSave())) return;
+    }
+    if (showLibrary) {
+      const lib = await WebviewWindow.getByLabel("main");
+      if (lib) { await lib.unminimize().catch(() => {}); await lib.setFocus().catch(() => {}); }
+    }
+    await win.destroy();
+  })().catch(error => say("Fenster konnte nicht geschlossen werden: " + String(error)))
+    .finally(() => { closing = null; });
+  return closing;
 }
 
-$<HTMLButtonElement>("b-home").addEventListener("click", () => void leaveReader());
+$<HTMLButtonElement>("b-home").addEventListener("click", () => void requestClose(true));
 
 btnInvert.addEventListener("click", () => {
   container.classList.toggle("invert");
@@ -955,6 +1053,8 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) suspe
 // ---------- Tastatur ----------
 
 window.addEventListener("keydown", (e) => {
+  if (ask.open || $<HTMLDialogElement>("library-delete").open) return;
+  if (activeSave) { e.preventDefault(); return; }
   const typing =
     e.target instanceof HTMLElement && (e.target.tagName === "INPUT" || e.target.isContentEditable);
   const ctrl = e.ctrlKey || e.metaKey;
@@ -1147,4 +1247,7 @@ if (IS_READER) {
   // Nach dem Schliessen eines Dokumentfensters kann sich die Seitenzahl
   // geaendert haben - beim Zurueckkommen neu aufbauen.
   window.addEventListener("focus", renderHome);
+  window.addEventListener("storage", event => {
+    if (event.key === KEY || event.key?.startsWith("folio.hidden.")) renderHome();
+  });
 }

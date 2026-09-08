@@ -490,6 +490,26 @@ body.bare #titlebar { pointer-events: none; }
   gap: 10px;
   animation: rise 0.5s var(--ease) backwards;
 }
+.library-item { position: relative; min-width: 0; }
+.library-item > .tile { width: 100%; }
+.library-more { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; border: 1px solid #ffffff30; border-radius: 50%; background: #262629e8; color: #f5f5f7; font-size: 24px; line-height: 1; box-shadow: 0 2px 8px #0004; }
+.library-more:hover { background: #454548; }
+#library-menu { position: fixed; z-index: 65; width: 248px; padding: 6px; border: 1px solid #ffffff30; border-radius: 16px; background: #2c2c2ef5; box-shadow: 0 12px 36px #0006; backdrop-filter: blur(18px); }
+#library-menu button { width: 100%; border: 0; border-radius: 10px; padding: 11px 12px; background: transparent; text-align: left; }
+#library-menu button:hover, #library-menu button:focus-visible { background: #ffffff14; }
+#library-menu span { display: block; margin-top: 3px; color: #c0c0c5; font-size: 11px; }
+#library-trash { color: #ffa6a2; }
+#library-delete { width: min(440px, calc(100vw - 32px)); padding: 24px; border: 1px solid #ffffff30; border-radius: 22px; background: #303033; color: var(--ink); box-shadow: 0 18px 60px #0005; }
+#library-delete::backdrop, #ask::backdrop { background: #0008; }
+#library-delete h2 { margin: 0 0 18px; font-size: 18px; font-weight: 600; }
+#library-delete-name { font-weight: 600; overflow-wrap: anywhere; }
+#library-delete-path { color: #c0c0c5; font-size: 11px; overflow-wrap: anywhere; max-height: 100px; overflow: auto; user-select: text; }
+#library-delete-description { color: #d4d4d7; line-height: 1.6; }
+#library-delete-error, #ask-error { color: #ffb5af; overflow-wrap: anywhere; max-height: 150px; overflow: auto; }
+#library-delete-error:empty, #ask-error:empty { display: none; }
+#library-delete-confirm { background: #a63a38; color: white; }
+#library-delete-confirm:hover { background: #bc4744; }
+button:disabled { opacity: 0.5; cursor: wait; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
 
@@ -619,12 +639,21 @@ body.dragging .drop .cover svg { stroke: var(--accent); transform: scale(1.25); 
   z-index: 70;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.5);
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
 }
 
 #askbox {
   position: relative;
   min-width: 320px;
+  max-width: min(460px, calc(100vw - 32px));
   padding: 24px 24px 18px;
   border-radius: 22px;
   animation: dropin 0.36s var(--spring);

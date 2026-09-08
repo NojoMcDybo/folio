@@ -78,16 +78,30 @@
       <div id="lens" class="glass" hidden><canvas id="lens-cv"></canvas></div>
     </section>
 
-    <div id="ask" hidden>
-      <div id="askbox" class="glass" role="dialog" aria-modal="true" aria-labelledby="asktext">
+    <div id="library-menu" role="menu" aria-label="PDF-Aktionen" hidden>
+      <button id="library-remove" role="menuitem">Aus Bibliothek entfernen<span>Die Datei bleibt erhalten</span></button>
+      <button id="library-trash" role="menuitem">In den Papierkorb<span>PDF vom Computer entfernen</span></button>
+    </div>
+    <dialog id="library-delete" aria-labelledby="library-delete-title" aria-describedby="library-delete-description">
+      <h2 id="library-delete-title">PDF in den Papierkorb?</h2>
+      <p id="library-delete-name"></p>
+      <p id="library-delete-path"></p>
+      <p id="library-delete-description">Die Datei und ihr Bibliothekseintrag werden entfernt. Die PDF lässt sich anschließend über den Windows-Papierkorb wiederherstellen.</p>
+      <p id="library-delete-error" role="alert"></p>
+      <div class="askrow"><button id="library-delete-cancel" autofocus>Abbrechen</button><button id="library-delete-confirm">In den Papierkorb</button></div>
+    </dialog>
+
+    <dialog id="ask" aria-labelledby="asktext" hidden>
+      <div id="askbox" class="glass">
         <p id="asktext">Änderungen sichern?</p>
+        <p id="ask-error" role="alert"></p>
         <div class="askrow">
           <button id="ask-save">Sichern</button>
           <button id="ask-drop">Verwerfen</button>
           <button id="ask-cancel">Abbrechen</button>
         </div>
       </div>
-    </div>
+    </dialog>
 
     <div id="toast" class="glass" hidden></div>
 

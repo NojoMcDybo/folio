@@ -1,27 +1,21 @@
+mod file_safety;
+
+use file_safety::{decode_hex_path, FileState};
 use std::path::PathBuf;
 use tauri::ipc::{InvokeBody, Request, Response};
+use tauri::{Manager, State, WebviewWindow};
 
 /// Liest eine PDF-Datei als Rohbytes.
 /// Rueckgabe als `Response`, damit Tauri die Bytes binaer durchreicht
 /// statt sie fuer die IPC nach Base64 zu kodieren.
 #[tauri::command]
-fn read_pdf(path: String) -> Result<Response, String> {
-    let p = PathBuf::from(&path);
-    if !p.is_file() {
-        return Err(format!("Keine Datei: {path}"));
-    }
-    let bytes = std::fs::read(&p).map_err(|e| format!("{path}: {e}"))?;
+fn read_pdf(
+    window: WebviewWindow,
+    state: State<'_, FileState>,
+    path: String,
+) -> Result<Response, String> {
+    let bytes = state.read_and_register(window.label(), &path)?;
     Ok(Response::new(bytes))
-}
-
-fn hex_decode(s: &str) -> Result<Vec<u8>, String> {
-    if s.len() % 2 != 0 {
-        return Err("ungueltige Hex-Laenge".into());
-    }
-    (0..s.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| e.to_string()))
-        .collect()
 }
 
 /// Schreibt das bearbeitete PDF zurueck.
@@ -34,30 +28,27 @@ fn hex_decode(s: &str) -> Result<Vec<u8>, String> {
 /// Vorgang mittendrin ab, ist das Original noch unversehrt - sonst koennte
 /// ein misslungenes Speichern das Dokument zerstoeren.
 #[tauri::command]
-fn save_pdf(request: Request<'_>) -> Result<(), String> {
+fn save_pdf(request: Request<'_>, state: State<'_, FileState>) -> Result<(), String> {
     let header = request
         .headers()
         .get("x-path")
         .ok_or("Kein Pfad uebergeben")?
         .to_str()
         .map_err(|e| e.to_string())?;
-    let path = String::from_utf8(hex_decode(header)?).map_err(|e| e.to_string())?;
+    let path = decode_hex_path(header)?;
 
     let bytes = match request.body() {
         InvokeBody::Raw(b) => b,
         _ => return Err("Erwarte Rohdaten".into()),
     };
 
-    let target = PathBuf::from(&path);
-    let mut tmp = target.clone();
-    tmp.as_mut_os_string().push(".folio-tmp");
+    state.save(&path, bytes)
+}
 
-    std::fs::write(&tmp, bytes).map_err(|e| format!("Schreiben fehlgeschlagen: {e}"))?;
-    std::fs::rename(&tmp, &target).map_err(|e| {
-        let _ = std::fs::remove_file(&tmp);
-        format!("Ersetzen fehlgeschlagen: {e}")
-    })?;
-    Ok(())
+/// Verschiebt eine geschlossene, regulaere PDF ausschliesslich in den Papierkorb.
+#[tauri::command]
+fn recycle_pdf(path: String, state: State<'_, FileState>) -> Result<(), String> {
+    state.recycle(&path)
 }
 
 /// Erstes Argument, das auf eine existierende PDF zeigt.
@@ -95,9 +86,20 @@ pub fn run() {
     }
 
     builder
+        .manage(FileState::default())
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                window.state::<FileState>().forget_window(window.label());
+            }
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![read_pdf, save_pdf, startup_file])
+        .invoke_handler(tauri::generate_handler![
+            read_pdf,
+            save_pdf,
+            recycle_pdf,
+            startup_file
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

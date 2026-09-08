@@ -24,6 +24,17 @@ Referenz: [Apple: Meet Liquid Glass](https://developer.apple.com/videos/play/wwd
 
 ## Glas und Lesbarkeit
 
+### Bibliothek und Speichern 0.7.0
+
+- Eigener Aktionsknopf pro Bibliothekskachel sowie Rechtsklickmenue. Entfernen betrifft nur den Eintrag; Papierkorb ist eine separate Aktion mit Dateiname, vollstaendigem Pfad und Bestaetigung. Abbrechen ist die erste fokussierte Aktion. Bei Dateifehlern bleiben Dialog und Eintrag erhalten.
+- Entfernte Eintraege erhalten einen Marker pro Pfad. Dadurch koennen Lesefortschritt oder spaete Vorschaubilder aus anderen Fenstern sie nicht versehentlich wieder eintragen. Bewusstes erneutes Oeffnen hebt den Marker auf; Bibliotheksfenster aktualisieren sich bei Speicheraenderungen.
+- PDF.js setzt seinen Aenderungsstatus bereits nach Serialisierung zurueck. Folio behandelt die PDF deshalb bis zum erfolgreichen nativen Schreiben weiter als ungesichert. Fehler bleiben im Speicherdialog sichtbar, Wiederholen ist moeglich. Abbrechen behaelt die Aenderungen; Verwerfen muss explizit angeklickt werden.
+- Speichervorgaenge werden zusammengefasst und die Bearbeitung waehrend der Serialisierung und des Schreibens kurz gesperrt. Fenster-X, Rueckkehr zur Bibliothek und native Schliessanforderungen verwenden dieselbe Absicherung.
+- Native Dateioperationen sind serialisiert. Geoeffnete PDFs werden anhand ihres kanonischen Pfads registriert und koennen erst nach Schliessen aller zugehoerigen Folio-Fenster recycelt werden. Fehlende, schreibgeschuetzte oder gesperrte Zieldateien fuehren beim Speichern zu einem Fehler.
+- Einzigartige Nebendatei mit create_new und sync_all; Windows ReplaceFileW ersetzt das Original mit eigener Sicherung. Bei fehlgeschlagener Wiederherstellung bleibt die Sicherung erhalten und ihr Pfad wird genannt. Grundlage: [Microsoft ReplaceFileW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-replacefilew).
+- Papierkorb ueber Windows IFileOperation mit Recycle-Flags und Fortschrittspruefung: PreDeleteItem verweigert Nicht-Papierkorboperationen, PostDeleteItem muss ein neu erstelltes Papierkorbobjekt bestaetigen. Es gibt keinen Fallback zum endgueltigen Loeschen. Besondere/verknuepfte Dateien werden beim Schreiben/Recyceln abgelehnt.
+- Pruefung: acht native Tests fuer Speichern/Schreibschutz/Sperren/Namenskollisionen/fehlende Ziele/Backup-Erhalt/Pfaddekodierung/Schutz geoeffneter Dokumente. Ein separat ausgefuehrter Papierkorb-Smoke-Test verschiebt nur eine selbst erzeugte Testdatei und bestaetigt das neue Papierkorbobjekt. Browserpruefungen mit echtem PDF.js decken Bibliotheksaktionen, Abbrechen, Fehler, Wiederholen, native Schliessereignisse, parallele Speicheraufrufe und aktive Texteingabe ab; exportierte Textanmerkung mit pypdf nachgeprueft.
+
 ### Lesewerkzeuge 0.6.0
 
 - Bei geoeffnetem Kapitelmenue oder Suchfeld werden Glas und Hintergrund mit bis zu 3 Pixeln pro CSS-Pixel gezeichnet (zuvor bei 100 Prozent Skalierung 1,5). Die gemeinsame Glasflaeche nutzt die hoehere Aufloesung nur solange eines dieser Panels sichtbar ist; Hardware-Groessenlimits bleiben wirksam. Kapitel-Canvas uebernimmt die volle Aufloesung. Der Panel-Blur verwendet 25 gewichtete Samples mit von der Aufloesung unabhaengigem Abstand.

@@ -30,9 +30,11 @@ Umgesetzt in 0.5.0: Knopf links oben oeffnet das Inhaltsverzeichnis aus vorhande
 
 ## 4. Bibliothek und verlaessliches Speichern
 
+Umgesetzt fuer 0.7.0: getrennte Bibliotheks-/Papierkorbaktionen, Dateibestaetigung mit Pfad und Schutz geoeffneter PDFs. Speichererfolg wird erst nach bestaetigtem Schreiben angenommen; Schliessen und native Fensteraktionen teilen denselben Speicherdialog. Dateitests und Browserpruefungen bestanden; Installation und abschliessendes Review siehe TEST-WORKFLOW.md.
+
 - Bestehenden Fehler beheben: Nach fehlgeschlagenem Speichern darf Schliessen keine ungesicherten Aenderungen verwerfen.
 - Zwei getrennte Aktionen anbieten: aus Bibliothek entfernen und PDF-Datei vom Computer loeschen.
-- Vorschlag fuer Dateiloeschung: Windows-Papierkorb, mit eindeutigem Dateinamen und Bestaetigung. Erst an Wegwerf-Testdateien pruefen.
+- Dateiloeschung auf Benutzerwunsch ueber Windows-Papierkorb, mit eindeutigem Dateinamen und Bestaetigung; an eigener Wegwerf-Testdatei erfolgreich geprueft.
 - Fehlende Dateien, Schreibschutz und abgebrochenes Speichern/Loeschen behandeln; Bibliothek nur nach erfolgreicher Dateiaktion aktualisieren.
 
 ## Bereits erledigt

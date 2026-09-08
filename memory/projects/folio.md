@@ -18,6 +18,8 @@ Phase 1 (0.3.0): Page chip reappears and persists on hover. Shared inversion fil
 
 ## User requests
 
+0.7.0: User explicitly requests final library phase: safeguard save failures, remove library entries, and delete PDF files preferably via Recycle Bin. Implemented and installed separate remove/recycle actions, confirmed file path, no permanent-delete fallback, open-document protection, and shared save/close failure handling. Eight native tests, explicit disposable recycle smoke test, browser regression/failure tests, active text export verification and fresh independent ship review passed. Test only disposable fixtures; preserve original app/source. Native file-safety work delegated under Astra Advisor, parent owns UI and acceptance.
+
 0.6.0: User requested higher chapter/search liquid-glass resolution, lens activation only over PDF paper, and saved pen colours for switching among five choices. Implemented up to 3x glass/backdrop rendering while either panel is visible, denser blur, PDF-canvas hit testing, and five editable persistent colour slots shared by annotation tools. Work remains isolated to Folio Test.
 
 0.5.1: User requested liquid-glass chapter menu with darkening on bright backgrounds, draggable like other controls, and a subtler small-style white internal scrollbar. Implemented for both opener and menu header, saved positions, adaptive material and independently scrolling content. User also explicitly requests Astra Advisor skill for subsequent project work; recorded in CLAUDE.md.
