@@ -53,8 +53,19 @@
         <button id="t-ink" class="ico glass solo side" title="Stift · Z"></button>
         <button id="a-toggle" class="ico glass solo" title="Anmerkungen" aria-expanded="false"></button>
         <button id="t-text" class="ico glass solo side" title="Textfeld · T"></button>
-        <label id="swatch" class="glass solo side" title="Farbe"><input id="color" type="color" value="#ffd23f" /></label>
+        <button id="swatch" class="glass solo side" title="Stiftfarben" aria-label="Stiftfarben" aria-expanded="false" aria-controls="color-panel"><span class="swatch-dot"></span></button>
       </div>
+
+      <section id="color-panel" role="dialog" aria-labelledby="color-heading" hidden>
+        <header><h2 id="color-heading">Meine Farben</h2><button id="color-close" aria-label="Farbauswahl schließen" title="Schließen">×</button></header>
+        <div id="color-slots" role="group" aria-label="Gespeicherte Farben"></div>
+        <form id="color-form">
+          <label id="color-label" for="color">Farbe für Platz 1</label>
+          <div class="color-edit"><input id="color" type="color" value="#ffd23f" /><input id="color-hex" aria-label="Farbwert als Hex-Code" type="text" value="#FFD23F" maxlength="7" pattern="#[a-fA-F0-9]{6}" spellcheck="false" autocomplete="off" required /></div>
+          <button id="color-save" type="submit">Platz 1 speichern</button>
+        </form>
+        <p id="color-status" role="status">Fünf Farben, auch beim nächsten Start.</p>
+      </section>
 
       <div id="findbar" class="glass row drag" data-glass="panel" hidden>
         <input id="find-q" type="text" aria-label="Im Dokument suchen" placeholder="Im Dokument suchen" spellcheck="false" autocomplete="off" />

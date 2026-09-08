@@ -11,6 +11,7 @@ import "./styles.css"; // muss nach pdf_viewer.css kommen
 import { GlassLayer } from "./glass";
 import { clampPosition, pageAtPosition, speedAtPosition } from "./scroll-navigation";
 import { OutlinePanel } from "./outline";
+import { ColorPalette } from "./color-palette";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -43,7 +44,6 @@ const PDF_INVERT_FILTER = getComputedStyle(document.documentElement).getProperty
 const findbar = $<HTMLElement>("findbar");
 const findInput = $<HTMLInputElement>("find-q");
 const findCount = $<HTMLElement>("find-count");
-const colorInput = $<HTMLInputElement>("color");
 const btnSave = $<HTMLButtonElement>("b-save");
 const btnInvert = $<HTMLButtonElement>("b-invert");
 const anngroup = $<HTMLElement>("anngroup");
@@ -251,7 +251,7 @@ const pdfViewer = new PDFViewer({
   // Ohne diese Liste bleibt PDF.js' interne Farbtabelle null - ihre eigene
   // Telemetrie beim Anlegen einer Markierung greift trotzdem darauf zu und
   // wirft einen TypeError (harmlos, aber jetzt behoben). Unsere eigene
-  // Farbauswahl (colorInput) ist davon unabhaengig.
+  // Farbauswahl ist davon unabhaengig.
   annotationEditorHighlightColors: "yellow=#FFFF98,green=#53FFBC,blue=#80EBFF,pink=#FFCBE6,red=#FF4F5F",
 });
 linkService.setViewer(pdfViewer);
@@ -539,12 +539,15 @@ function applyColor() {
     : tool === "text" ? EditorParams.FREETEXT_COLOR
     : null;
   if (type === null) return;
-  eventBus.dispatch("switchannotationeditorparams", { source: window, type, value: colorInput.value });
+  eventBus.dispatch("switchannotationeditorparams", { source: window, type, value: colorPalette.color });
 }
+
+const colorPalette = new ColorPalette($<HTMLButtonElement>("swatch"), $<HTMLElement>("color-panel"), applyColor, say);
 
 function openAnn() { anngroup.classList.add("open"); btnTool.setAttribute("aria-expanded", "true"); }
 
 function closeAnn() {
+  colorPalette.close();
   anngroup.classList.remove("open");
   btnTool.setAttribute("aria-expanded", "false");
   if (tool !== "none") setTool("none");
@@ -560,7 +563,6 @@ btnTool.addEventListener("click", () => {
 for (const [key, btn] of Object.entries(toolBtn)) {
   btn.addEventListener("click", () => setTool(tool === key ? "none" : key));
 }
-colorInput.addEventListener("input", applyColor);
 
 btnSave.addEventListener("click", () => void save());
 
@@ -695,28 +697,27 @@ const LENS_ZOOM = 2.5;
 const LENS_SIZE = 160; // CSS-Px der scharfen Mitte; auch Quelle fuer das Layout
 lens.style.setProperty("--lens-size", `${LENS_SIZE}px`);
 
-function overContainer(x: number, y: number) {
+function pageCanvasAt(x: number, y: number) {
   const r = container.getBoundingClientRect();
-  return x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + r.height;
+  if (reader.hidden || document.body.classList.contains("bare") || x < r.left || x >= r.right || y < r.top || y >= r.bottom) return null;
+  return [...container.querySelectorAll<HTMLCanvasElement>(".pdfViewer .canvasWrapper canvas")].find(cv => {
+    const page = cv.getBoundingClientRect();
+    return cv.width > 0 && cv.height > 0 && x >= page.left && x < page.right && y >= page.top && y < page.bottom;
+  }) ?? null;
 }
 
-function paintLens(x: number, y: number) {
+function paintLens(x: number, y: number, cv: HTMLCanvasElement) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const size = Math.round(LENS_SIZE * dpr);
   if (lensCv.width !== size) { lensCv.width = size; lensCv.height = size; }
   lensCtx.clearRect(0, 0, size, size);
 
-  const pages = container.querySelectorAll<HTMLCanvasElement>(".pdfViewer .canvasWrapper canvas");
-  for (const cv of pages) {
-    const r = cv.getBoundingClientRect();
-    if (x < r.x || x > r.x + r.width || y < r.y || y > r.y + r.height) continue;
-    const sx = ((x - r.x) / r.width) * cv.width;
-    const sy = ((y - r.y) / r.height) * cv.height;
-    const sw = (LENS_SIZE / LENS_ZOOM) * (cv.width / r.width);
-    const sh = (LENS_SIZE / LENS_ZOOM) * (cv.height / r.height);
-    lensCtx.drawImage(cv, sx - sw / 2, sy - sh / 2, sw, sh, 0, 0, size, size);
-    break;
-  }
+  const r = cv.getBoundingClientRect();
+  const sx = ((x - r.x) / r.width) * cv.width;
+  const sy = ((y - r.y) / r.height) * cv.height;
+  const sw = (LENS_SIZE / LENS_ZOOM) * (cv.width / r.width);
+  const sh = (LENS_SIZE / LENS_ZOOM) * (cv.height / r.height);
+  lensCtx.drawImage(cv, sx - sw / 2, sy - sh / 2, sw, sh, 0, 0, size, size);
 
   // Invertiert-Modus faerbt die Seiten-Canvas per CSS-Filter um - sonst
   // zeigt die Lupe die falschen Farben.
@@ -728,15 +729,19 @@ function paintLens(x: number, y: number) {
 btnFind.addEventListener("pointerdown", (e) => {
   if (e.button !== 0) return;
   let lensing = false;
+  let moved = false;
+  let x = e.clientX, y = e.clientY;
 
-  const onMove = (ev: PointerEvent) => {
-    if (overContainer(ev.clientX, ev.clientY)) {
+  const update = () => {
+    if (!moved) return;
+    const cv = pageCanvasAt(x, y);
+    if (cv) {
       lensing = true;
-      lens.style.left = ev.clientX + "px";
-      lens.style.top = ev.clientY + "px";
+      lens.style.left = x + "px";
+      lens.style.top = y + "px";
       lens.hidden = false;
       btnFind.classList.add("lens-hidden");
-      paintLens(ev.clientX, ev.clientY);
+      paintLens(x, y, cv);
     } else if (lensing) {
       lensing = false;
       lens.hidden = true;
@@ -744,10 +749,19 @@ btnFind.addEventListener("pointerdown", (e) => {
     }
   };
 
+  const onMove = (ev: PointerEvent) => {
+    x = ev.clientX; y = ev.clientY;
+    moved ||= Math.hypot(x - e.clientX, y - e.clientY) >= 5;
+    update();
+  };
+
   const onUp = () => {
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
     window.removeEventListener("pointercancel", onUp);
+    window.removeEventListener("blur", onUp);
+    container.removeEventListener("scroll", update);
+    window.removeEventListener("resize", update);
     lens.hidden = true;
     btnFind.classList.remove("lens-hidden");
   };
@@ -755,6 +769,9 @@ btnFind.addEventListener("pointerdown", (e) => {
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
   window.addEventListener("pointercancel", onUp);
+  window.addEventListener("blur", onUp);
+  container.addEventListener("scroll", update);
+  window.addEventListener("resize", update);
 });
 
 // ---------- Bildlaufleiste ----------
@@ -943,7 +960,7 @@ window.addEventListener("keydown", (e) => {
   const ctrl = e.ctrlKey || e.metaKey;
   const k = e.key.toLowerCase();
 
-  if (e.key === "F11") { e.preventDefault(); suspendScrolling(); outlinePanel.close(); document.body.classList.toggle("bare"); return; }
+  if (e.key === "F11") { e.preventDefault(); suspendScrolling(); outlinePanel.close(); colorPalette.close(); document.body.classList.toggle("bare"); return; }
   if (reader.hidden) {
     if (ctrl && k === "o") { e.preventDefault(); void pick(); }
     return;

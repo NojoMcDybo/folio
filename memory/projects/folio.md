@@ -18,6 +18,8 @@ Phase 1 (0.3.0): Page chip reappears and persists on hover. Shared inversion fil
 
 ## User requests
 
+0.6.0: User requested higher chapter/search liquid-glass resolution, lens activation only over PDF paper, and saved pen colours for switching among five choices. Implemented up to 3x glass/backdrop rendering while either panel is visible, denser blur, PDF-canvas hit testing, and five editable persistent colour slots shared by annotation tools. Work remains isolated to Folio Test.
+
 0.5.1: User requested liquid-glass chapter menu with darkening on bright backgrounds, draggable like other controls, and a subtler small-style white internal scrollbar. Implemented for both opener and menu header, saved positions, adaptive material and independently scrolling content. User also explicitly requests Astra Advisor skill for subsequent project work; recorded in CLAUDE.md.
 
 0.5.0: User requested scroll-speed calculation to start only outside the zero zone, then chapter access. Removed the fixed initial speed; quadratic ramp starts at zero at the zone boundary. Added hierarchical PDF bookmark panel with destination/page-label resolution and unchanged zoom. Browser-tested with real nested/named/broken/external bookmark fixtures and no-bookmark PDF; existing scroll/UI checks pass.

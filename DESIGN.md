@@ -24,6 +24,13 @@ Referenz: [Apple: Meet Liquid Glass](https://developer.apple.com/videos/play/wwd
 
 ## Glas und Lesbarkeit
 
+### Lesewerkzeuge 0.6.0
+
+- Bei geoeffnetem Kapitelmenue oder Suchfeld werden Glas und Hintergrund mit bis zu 3 Pixeln pro CSS-Pixel gezeichnet (zuvor bei 100 Prozent Skalierung 1,5). Die gemeinsame Glasflaeche nutzt die hoehere Aufloesung nur solange eines dieser Panels sichtbar ist; Hardware-Groessenlimits bleiben wirksam. Kapitel-Canvas uebernimmt die volle Aufloesung. Der Panel-Blur verwendet 25 gewichtete Samples mit von der Aufloesung unabhaengigem Abstand.
+- Lupe aktiviert sich erst nach Ziehbeginn und nur mit Zeiger auf einer gerenderten PDF-Seitenflaeche innerhalb des sichtbaren Lesebereichs. Hintergrund und Seitenzwischenraeume aktivieren sie nicht. Scrollen/Fenstergroesse pruefen die Position erneut; Loslassen, Abbruch und Fokusverlust blenden sie aus.
+- Stiftfarben: fuenf direkt waehlbare Plaetze fuer Marker, Stift und Text. Farbfeld oder Hex-Eingabe bearbeitet den gewaehlten Platz; explizites Speichern uebernimmt die Farbe. Palette und Auswahl bleiben unter `folio.pen-colors` erhalten. Beim Schreiben werden andere Plaetze aus dem neuesten Speicherstand uebernommen. Ungueltige Daten werden abgefangen, Speicherfehler sichtbar gemeldet.
+- Eigenes kompaktes Farbpanel am Farbknopf, innerhalb des Fensters begrenzt. Escape schliesst nur die Farbwahl; aktive Stifte bleiben aktiv. Klick ausserhalb, Schliessen der Werkzeuge und F11 schliessen das Panel.
+
 - Lichtbrechung vorwiegend am Rand, auf wenige Pixel begrenzt. Keine RGB-Aufspaltung und keine adaptive Abdunklung der Glasflaeche.
 - Pixelabdeckung aus der Distanzfunktion mit Ableitungen; Zeichenrechteck geht ueber die Kontur hinaus. So wird die aeussere Kantenglaettung nicht abgeschnitten.
 - Die Aufloesung folgt der Bildschirmskalierung und den GPU-Grenzen. Der bisherige pauschale vierfache Vollbild-Renderpuffer und die Symboltexturen entfallen.

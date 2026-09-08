@@ -45,7 +45,7 @@ void main() {
   vec2 offset = -normal * pow(edge, mix(2.0, 1.25, uWideScroll)) * refraction * uScale / uRes;
   vec2 sampleUV = uv + offset;
   vec3 clear = texture(uBack, sampleUV).rgb;
-  vec2 stepUV = uTexel * mix(1.6, 9.0, uPanel);
+  vec2 stepUV = uTexel * 1.6;
   vec3 soft = clear * 0.28;
   soft += texture(uBack, sampleUV + vec2(stepUV.x, 0.0)).rgb * 0.12;
   soft += texture(uBack, sampleUV - vec2(stepUV.x, 0.0)).rgb * 0.12;
@@ -53,6 +53,19 @@ void main() {
   soft += texture(uBack, sampleUV - vec2(0.0, stepUV.y)).rgb * 0.12;
   soft += texture(uBack, sampleUV + stepUV).rgb * 0.11;
   soft += texture(uBack, sampleUV - stepUV).rgb * 0.11;
+  if (uPanel > 0.5) {
+    // Dense Gaussian sampling avoids separated, blocky echoes of document text.
+    // Keep the optical blur in CSS pixels when the render resolution changes.
+    vec2 panelStep = vec2(3.0 * uScale) / uRes;
+    soft = vec3(0.0);
+    float total = 0.0;
+    for (int y = -2; y <= 2; y++) for (int x = -2; x <= 2; x++) {
+      float weight = exp(-float(x*x + y*y) / 3.0);
+      soft += texture(uBack, sampleUV + vec2(float(x), float(y)) * panelStep).rgb * weight;
+      total += weight;
+    }
+    soft /= total;
+  }
   vec3 col = mix(clear, soft, mix(0.18, 0.85, uPanel));
   // Thin neutral sheen; no adaptive dark tint.
   col = mix(col, vec3(1.0), 0.035 + 0.025 * uHover + 0.025 * uPanel);
@@ -124,6 +137,7 @@ export class GlassLayer {
   private pixels: Uint8ClampedArray = new Uint8ClampedArray();
   private scale = 1;
   private dpr = 1;
+  private detailed = false;
   private dirty = true;
   private lost = false;
   private painter: Painter = () => {};
@@ -181,12 +195,12 @@ export class GlassLayer {
     if (this.lost) return;
     this.dpr = devicePixelRatio || 1;
     const max = Math.min(this.gl.getParameter(this.gl.MAX_TEXTURE_SIZE), this.gl.getParameter(this.gl.MAX_RENDERBUFFER_SIZE));
-    this.scale = Math.min(Math.max(1.5, this.dpr), 3, max / innerWidth, max / innerHeight);
+    this.scale = Math.min(Math.max(this.detailed ? 3 : 1.5, this.dpr), 3, max / innerWidth, max / innerHeight);
     this.canvas.width = Math.max(1, Math.round(innerWidth * this.scale));
     this.canvas.height = Math.max(1, Math.round(innerHeight * this.scale));
     this.canvas.style.width = `${innerWidth}px`;
     this.canvas.style.height = `${innerHeight}px`;
-    const backScale = Math.min(this.scale, 2);
+    const backScale = Math.min(this.scale, this.detailed ? 3 : 2);
     this.backdrop.width = Math.max(1, Math.round(innerWidth * backScale));
     this.backdrop.height = Math.max(1, Math.round(innerHeight * backScale));
     this.invalidate();
@@ -210,7 +224,12 @@ export class GlassLayer {
   private frame = () => {
     requestAnimationFrame(this.frame);
     if (this.lost || document.hidden) return;
-    if (this.dpr !== (devicePixelRatio || 1)) this.resize();
+    const detailed = !document.body.classList.contains("bare") &&
+      [...document.querySelectorAll<HTMLElement>("#outline-panel, #findbar")].some(el => opacityOf(el) >= 0.01);
+    if (this.detailed !== detailed || this.dpr !== (devicePixelRatio || 1)) {
+      this.detailed = detailed;
+      this.resize();
+    }
     const gl = this.gl;
     if (this.dirty) {
       this.painter(this.ctx, this.backdrop.width, this.backdrop.height);
