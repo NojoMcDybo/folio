@@ -1,9 +1,10 @@
 {
   "name": "folio",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.8.0",
   "type": "module",
   "scripts": {
+    "installer:build": "tauri build --bundles nsis",
     "dev": "vite",
     "build": "tsc && vite build",
     "test:scroll": "node --test tests/scroll-navigation.test.mjs",

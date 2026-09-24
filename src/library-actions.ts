@@ -1,6 +1,6 @@
 type LibraryEntry = { path: string; name: string };
 
-/** A reversible library action and a separately confirmed file action. */
+/** Explorer access, a library action and a separately confirmed file action. */
 export class LibraryActions {
   private entry: LibraryEntry | null = null;
   private opener: HTMLElement | null = null;
@@ -12,8 +12,17 @@ export class LibraryActions {
   private cancel = document.getElementById("library-delete-cancel") as HTMLButtonElement;
 
   constructor(private remove: (path: string) => boolean,
-    private recycle: (path: string) => Promise<void>, private refresh: () => void,
+    private recycle: (path: string) => Promise<void>,
+    private reveal: (path: string) => Promise<void>, private refresh: () => void,
     private notify: (message: string) => void) {
+    document.getElementById("library-reveal")!.addEventListener("click", async () => {
+      if (!this.entry) return;
+      const { path } = this.entry;
+      this.closeMenu();
+      this.restoreFocus();
+      try { await this.reveal(path); }
+      catch { this.notify("Speicherort konnte nicht geöffnet werden. Die PDF wurde möglicherweise verschoben oder ist nicht mehr verfügbar."); }
+    });
     document.getElementById("library-remove")!.addEventListener("click", () => {
       if (!this.entry) return;
       const { path } = this.entry;
@@ -57,7 +66,8 @@ export class LibraryActions {
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
         const buttons = [...this.menu.querySelectorAll<HTMLButtonElement>("button")];
-        buttons[(buttons.indexOf(document.activeElement as HTMLButtonElement) + 1) % buttons.length].focus();
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        buttons[(buttons.indexOf(document.activeElement as HTMLButtonElement) + step + buttons.length) % buttons.length].focus();
       }
     });
     document.addEventListener("pointerdown", event => {
