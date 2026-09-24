@@ -8,7 +8,7 @@ import {
 } from "pdfjs-dist/web/pdf_viewer.mjs";
 import "pdfjs-dist/web/pdf_viewer.css";
 import "./styles.css"; // muss nach pdf_viewer.css kommen
-import { GlassLayer } from "./glass";
+import { createGlassRenderer } from "./glass-renderer";
 import { clampPosition, pageAtPosition, speedAtPosition } from "./scroll-navigation";
 import { OutlinePanel } from "./outline";
 import { ColorPalette } from "./color-palette";
@@ -245,13 +245,7 @@ function paintBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
   // spiegeln, nicht die Bibliothek.
 }
 
-let glass: GlassLayer | null = null;
-try {
-  glass = new GlassLayer($<HTMLCanvasElement>("glasslayer"));
-  glass.setPainter(paintBackdrop);
-} catch {
-  document.body.classList.add("no-gl");
-}
+const glass = createGlassRenderer($<HTMLCanvasElement>("glasslayer"), paintBackdrop);
 
 // ---------- PDF.js ----------
 

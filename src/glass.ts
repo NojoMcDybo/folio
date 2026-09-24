@@ -89,10 +89,22 @@ void main() {
   outColor = vec4(col, coverage * uOpacity);
 }`;
 
-function createProgram(gl: WebGL2RenderingContext) {
+type GL = WebGLRenderingContext | WebGL2RenderingContext;
+
+function createProgram(gl: GL, webgl2: boolean) {
+  const derivatives = webgl2 || !!gl.getExtension("OES_standard_derivatives");
+  const vertex = webgl2 ? VERTEX : VERTEX.replace("#version 300 es\n", "").replace("in vec2 aPos;", "attribute vec2 aPos;");
+  const fragment = webgl2 ? FRAGMENT :
+    (derivatives ? "#extension GL_OES_standard_derivatives : enable\n" : "") + FRAGMENT
+      .replace("#version 300 es\n", "")
+      .replace("precision highp float;", "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif")
+      .replace("out vec4 outColor;", "")
+      .replace(/texture\(/g, "texture2D(")
+      .replace("outColor =", "gl_FragColor =")
+      .replace("fwidth(d)", derivatives ? "fwidth(d)" : "1.0");
   const p = gl.createProgram();
   if (!p) throw new Error("WebGL program unavailable");
-  for (const [type, source] of [[gl.VERTEX_SHADER, VERTEX], [gl.FRAGMENT_SHADER, FRAGMENT]] as const) {
+  for (const [type, source] of [[gl.VERTEX_SHADER, vertex], [gl.FRAGMENT_SHADER, fragment]] as const) {
     const shader = gl.createShader(type);
     if (!shader) throw new Error("WebGL shader unavailable");
     gl.shaderSource(shader, source);
@@ -126,9 +138,14 @@ function opacityOf(el: HTMLElement) {
 }
 
 export class GlassLayer {
-  private gl: WebGL2RenderingContext;
+  private gl: GL;
+  private webgl2: boolean;
   private p!: WebGLProgram;
   private texture!: WebGLTexture;
+  private buffer: WebGLBuffer | null = null;
+  private raf = 0;
+  private stopped = false;
+  private lastHealthCheck = -Infinity;
   private uniforms = new Map<string, WebGLUniformLocation | null>();
   private backdrop = document.createElement("canvas");
   private ctx: CanvasRenderingContext2D;
@@ -145,36 +162,56 @@ export class GlassLayer {
   private lightLevels = new WeakMap<HTMLElement, number>();
   private chapterSurfaces = new WeakMap<HTMLElement, { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D }>();
 
-  constructor(private canvas: HTMLCanvasElement) {
-    const gl = canvas.getContext("webgl2", { alpha: true, premultipliedAlpha: false, antialias: false });
-    if (!gl) throw new Error("WebGL2 nicht verfügbar");
+  constructor(private canvas: HTMLCanvasElement, private onFailure: (error: unknown) => void = () => document.body.classList.add("no-gl")) {
+    const options = { alpha: true, premultipliedAlpha: false, antialias: false };
+    const modern = canvas.getContext("webgl2", options) as WebGL2RenderingContext | null;
+    const gl = modern ?? canvas.getContext("webgl", options) as WebGLRenderingContext | null;
+    if (!gl) throw new Error("WebGL nicht verfügbar");
+    this.webgl2 = !!modern;
     this.gl = gl;
     this.ctx = this.backdrop.getContext("2d", { alpha: false })!;
     this.sample.width = this.sample.height = 80;
     this.sampleCtx = this.sample.getContext("2d", { willReadFrequently: true })!;
-    this.init();
-    window.addEventListener("resize", () => this.resize());
-    canvas.addEventListener("webglcontextlost", (event) => {
-      event.preventDefault(); this.lost = true;
-      document.body.classList.add("no-gl");
-    });
-    canvas.addEventListener("webglcontextrestored", () => {
-      this.lost = false; this.init();
-      document.body.classList.remove("no-gl");
-    });
-    requestAnimationFrame(this.frame);
+    try { this.init(); } catch (error) { this.dispose(); throw error; }
+    document.body.dataset.glassRenderer = this.webgl2 ? "webgl2" : "webgl1";
+    window.addEventListener("resize", this.onResize);
+    canvas.addEventListener("webglcontextlost", this.onContextLost);
+    this.raf = requestAnimationFrame(this.frame);
+  }
+
+  private onResize = () => { try { this.resize(); } catch (error) { this.fail(error); } };
+  private onContextLost = (event: Event) => {
+    event.preventDefault(); this.lost = true;
+    this.fail(new Error("Grafikverbindung verloren"));
+  };
+  private fail(error: unknown) {
+    if (this.stopped) return;
+    this.dispose();
+    this.onFailure(error);
+  }
+  dispose() {
+    this.stopped = true;
+    cancelAnimationFrame(this.raf);
+    window.removeEventListener("resize", this.onResize);
+    this.canvas.removeEventListener("webglcontextlost", this.onContextLost);
+    this.gl.deleteBuffer(this.buffer);
+    if (this.texture) this.gl.deleteTexture(this.texture);
+    if (this.p) this.gl.deleteProgram(this.p);
+    document.querySelectorAll(".chapter-surface").forEach(surface => surface.remove());
   }
 
   private init() {
     const gl = this.gl;
-    this.p = createProgram(gl);
+    this.p = createProgram(gl, this.webgl2);
     this.uniforms.clear();
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    this.buffer = gl.createBuffer();
+    if (!this.buffer) throw new Error("WebGL buffer unavailable");
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     this.texture = gl.createTexture()!;
+    if (!this.texture) throw new Error("WebGL texture unavailable");
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -195,7 +232,10 @@ export class GlassLayer {
     if (this.lost) return;
     this.dpr = devicePixelRatio || 1;
     const max = Math.min(this.gl.getParameter(this.gl.MAX_TEXTURE_SIZE), this.gl.getParameter(this.gl.MAX_RENDERBUFFER_SIZE));
-    this.scale = Math.min(Math.max(this.detailed ? 3 : 1.5, this.dpr), 3, max / innerWidth, max / innerHeight);
+    const viewport = this.gl.getParameter(this.gl.MAX_VIEWPORT_DIMS) as Int32Array;
+    // Bound both dimensions and total allocation on older/integrated graphics.
+    this.scale = Math.min(Math.max(this.detailed ? 3 : 1.5, this.dpr), 3, max / innerWidth, max / innerHeight,
+      viewport[0] / innerWidth, viewport[1] / innerHeight, Math.sqrt(12_000_000 / (innerWidth * innerHeight)));
     this.canvas.width = Math.max(1, Math.round(innerWidth * this.scale));
     this.canvas.height = Math.max(1, Math.round(innerHeight * this.scale));
     this.canvas.style.width = `${innerWidth}px`;
@@ -221,8 +261,18 @@ export class GlassLayer {
       this.contrast.set(el, light);
     }
   }
-  private frame = () => {
-    requestAnimationFrame(this.frame);
+  private frame = (now: number) => {
+    if (this.stopped) return;
+    try { this.draw();
+      if (now - this.lastHealthCheck > 1000) {
+        this.lastHealthCheck = now;
+        const error = this.gl.getError();
+        if (error !== this.gl.NO_ERROR) throw new Error(`WebGL render error ${error}`);
+      }
+    } catch (error) { this.fail(error); return; }
+    this.raf = requestAnimationFrame(this.frame);
+  };
+  private draw() {
     if (this.lost || document.hidden) return;
     const detailed = !document.body.classList.contains("bare") &&
       [...document.querySelectorAll<HTMLElement>("#outline-panel, #findbar")].some(el => opacityOf(el) >= 0.01);
@@ -291,5 +341,5 @@ export class GlassLayer {
         surface.ctx.drawImage(this.canvas, r.x * k, r.y * k, r.width * k, r.height * k, 0, 0, width, height);
       }
     }
-  };
+  }
 }
