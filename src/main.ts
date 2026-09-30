@@ -13,6 +13,7 @@ import { clampPosition, pageAtPosition, speedAtPosition } from "./scroll-navigat
 import { OutlinePanel } from "./outline";
 import { ColorPalette } from "./color-palette";
 import { LibraryActions } from "./library-actions";
+import { notchClosed, notchReading } from "./notch";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -378,6 +379,7 @@ eventBus.on("pagechanging", (e: { pageNumber: number }) => {
   flashChip(e.pageNumber + " / " + pdfViewer.pagesCount);
   if (currentPath) {
     touchRecent({ path: currentPath, page: e.pageNumber, pages: pdfViewer.pagesCount });
+    void notchReading(currentPath, e.pageNumber, pdfViewer.pagesCount);
   }
 });
 
@@ -452,6 +454,7 @@ async function openPath(path: string) {
     touchRecent({ path, name, thumb: known?.thumb ?? "", pages: doc.numPages, page: pendingPage }, true);
     const thumb = known?.thumb || (await makeThumb(doc));
     if (thumb) touchRecent({ path, thumb });
+    void notchReading(path, pendingPage, doc.numPages, { name, thumb });
   } catch (err) {
     say("Konnte nicht geöffnet werden: " + String(err));
   }
@@ -687,6 +690,7 @@ function requestClose(showLibrary = false): Promise<void> {
       const lib = await WebviewWindow.getByLabel("main");
       if (lib) { await lib.unminimize().catch(() => {}); await lib.setFocus().catch(() => {}); }
     }
+    if (IS_READER) notchClosed();
     await win.destroy();
   })().catch(error => say("Fenster konnte nicht geschlossen werden: " + String(error)))
     .finally(() => { closing = null; });
