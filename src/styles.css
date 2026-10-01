@@ -492,7 +492,8 @@ body.bare #titlebar { pointer-events: none; }
 }
 .library-item { position: relative; min-width: 0; }
 .library-item > .tile { width: 100%; }
-.library-more { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; border: 1px solid #ffffff30; border-radius: 50%; background: #262629e8; color: #f5f5f7; font-size: 24px; line-height: 1; box-shadow: 0 2px 8px #0004; }
+.library-more { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 1px solid #ffffff30; border-radius: 50%; background: #262629e8; color: #f5f5f7; box-shadow: 0 2px 8px #0004; }
+.library-more svg { display: block; width: 24px; height: 24px; }
 .library-more:hover { background: #454548; }
 #library-menu { position: fixed; z-index: 65; width: 248px; padding: 6px; border: 1px solid #ffffff30; border-radius: 16px; background: #2c2c2ef5; box-shadow: 0 12px 36px #0006; backdrop-filter: blur(18px); }
 #library-menu button { width: 100%; border: 0; border-radius: 10px; padding: 11px 12px; background: transparent; text-align: left; }

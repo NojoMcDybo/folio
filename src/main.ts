@@ -8,7 +8,7 @@ import {
 } from "pdfjs-dist/web/pdf_viewer.mjs";
 import "pdfjs-dist/web/pdf_viewer.css";
 import "./styles.css"; // muss nach pdf_viewer.css kommen
-import { GlassLayer } from "./glass";
+import { createGlassRenderer } from "./glass-renderer";
 import { clampPosition, pageAtPosition, speedAtPosition } from "./scroll-navigation";
 import { OutlinePanel } from "./outline";
 import { ColorPalette } from "./color-palette";
@@ -17,6 +17,7 @@ import { notchClosed, notchReading } from "./notch";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { WebviewWindow, getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
@@ -154,7 +155,7 @@ function removeRecent(path: string) {
 }
 
 const libraryActions = new LibraryActions(removeRecent,
-  path => invoke<void>("recycle_pdf", { path }), renderHome, say);
+  path => invoke<void>("recycle_pdf", { path }), revealItemInDir, renderHome, say);
 
 function renderHome() {
   libraryActions.closeMenu();
@@ -200,7 +201,7 @@ function renderHome() {
     t.addEventListener("click", () => void openDoc(r.path));
     const actions = document.createElement("button");
     actions.className = "library-more";
-    actions.textContent = "⋯";
+    actions.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/></svg>';
     actions.title = "Weitere Aktionen";
     actions.setAttribute("aria-label", "Aktionen für " + r.name);
     actions.setAttribute("aria-haspopup", "menu");
@@ -245,13 +246,7 @@ function paintBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number) {
   // spiegeln, nicht die Bibliothek.
 }
 
-let glass: GlassLayer | null = null;
-try {
-  glass = new GlassLayer($<HTMLCanvasElement>("glasslayer"));
-  glass.setPainter(paintBackdrop);
-} catch {
-  document.body.classList.add("no-gl");
-}
+const glass = createGlassRenderer($<HTMLCanvasElement>("glasslayer"), paintBackdrop);
 
 // ---------- PDF.js ----------
 
