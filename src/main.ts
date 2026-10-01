@@ -13,7 +13,7 @@ import { clampPosition, pageAtPosition, speedAtPosition } from "./scroll-navigat
 import { OutlinePanel } from "./outline";
 import { ColorPalette } from "./color-palette";
 import { LibraryActions } from "./library-actions";
-import { notchClosed, notchReading } from "./notch";
+import { notchClosed, notchOnSearch, notchReading, notchSearchState } from "./notch";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -732,6 +732,7 @@ function dispatchFind(again: boolean, previous = false) {
 }
 
 function showCount(m?: { current: number; total: number }) {
+  if (IS_READER) notchSearchState(findInput.value, m ?? null);
   if (!findInput.value) { findCount.textContent = ""; return; }
   const { current, total } = m ?? { current: 0, total: 0 };
   findCount.textContent = total ? current + " / " + total : "0";
@@ -773,7 +774,30 @@ function closeFind() {
   btnFind.classList.remove("on");
   findInput.value = "";
   findCount.textContent = "";
+  if (IS_READER) notchSearchState("", null);
   dispatchFind(false);
+}
+
+// Suchfeld in der Notch: steuert dieselbe Suche wie die eigene Leiste.
+// Tippen sucht im Hintergrund, Enter springt weiter und holt das Fenster nach vorn.
+if (IS_READER) {
+  notchOnSearch((q, submit) => {
+    if (!q) { if (!findbar.hidden || findInput.value) closeFind(); return; }
+    if (findbar.hidden) {
+      findbar.hidden = false;
+      refreshDrag();
+      btnFind.classList.add("on");
+    }
+    const changed = findInput.value !== q;
+    findInput.value = q;
+    if (submit) {
+      dispatchFind(!changed, submit === "prev");
+      const w = getCurrentWindow();
+      void w.unminimize().then(() => w.setFocus()).catch(() => {});
+    } else if (changed) {
+      dispatchFind(false);
+    }
+  });
 }
 
 btnFind.addEventListener("click", () => (findbar.hidden ? openFind() : closeFind()));

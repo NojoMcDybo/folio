@@ -100,7 +100,8 @@ pub fn run() {
             save_pdf,
             recycle_pdf,
             startup_file,
-            notch::notch_send
+            notch::notch_send,
+            notch::notch_events
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
