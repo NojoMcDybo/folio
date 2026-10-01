@@ -1,4 +1,5 @@
 mod file_safety;
+mod notch;
 
 use file_safety::{decode_hex_path, FileState};
 use std::path::PathBuf;
@@ -98,7 +99,8 @@ pub fn run() {
             read_pdf,
             save_pdf,
             recycle_pdf,
-            startup_file
+            startup_file,
+            notch::notch_send
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

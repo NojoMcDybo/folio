@@ -7,7 +7,7 @@
  * Standard-PDF-Reader ist, holt das genau dieses Dokumentfenster nach vorn.
  */
 
-const BASE = "http://127.0.0.1:47800";
+import { invoke } from "@tauri-apps/api/core";
 // Jede Minute auffrischen: startet die Notch neu, ist Folio nach spaetestens 60 s wieder drin.
 // Stuerzt Folio ab, verschwindet der Eintrag nach der ttl von selbst.
 const REFRESH_MS = 60_000;
@@ -28,13 +28,9 @@ function hash(s: string) {
   return h.toString(36);
 }
 
-/** Ohne Content-Type-Header ist das ein "einfacher" Request: kein CORS-Vorabcheck noetig. */
+/** Ueber Rust senden (src-tauri/src/notch.rs): fetch() an localhost sperrt WebView2 inzwischen. */
 function send(method: "POST" | "DELETE", path: string, data?: unknown) {
-  return fetch(BASE + path, {
-    method,
-    body: data ? JSON.stringify(data) : undefined,
-    keepalive: true,
-  }).catch(() => {});
+  return invoke("notch_send", { method, path, body: data ? JSON.stringify(data) : null }).catch(() => {});
 }
 
 /** Deckelbild auf Symbolgroesse verkleinern (die Notch zeigt es 30 px gross). */
