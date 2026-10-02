@@ -2,7 +2,7 @@
 
 ## Installation
 
-`Folio_0.8.1_x64-setup.exe` installiert Folio auf Windows 10 und 11 (64 Bit, Intel/AMD).
+`Folio_0.8.2_x64-setup.exe` installiert Folio auf Windows 10 und 11 (64 Bit, Intel/AMD).
 Die benötigte Microsoft-WebView2-Laufzeit ist im Paket enthalten. Zur Installation
 ist keine Internetverbindung nötig. Eine bereits vorhandene Laufzeit wird verwendet.
 
@@ -58,7 +58,7 @@ npm ci
 npm run installer:build
 ```
 
-Ausgabe: `src-tauri/target/release/bundle/nsis/Folio_0.8.1_x64-setup.exe`.
+Ausgabe: `src-tauri/target/release/bundle/nsis/Folio_0.8.2_x64-setup.exe`.
 Beim ersten Build wird der offizielle Microsoft-WebView2-Offline-Installer
 heruntergeladen; er bleibt danach im lokalen Tauri-Cache.
 
