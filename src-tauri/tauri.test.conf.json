@@ -21,6 +21,16 @@
   },
   "bundle": {
     "fileAssociations": [],
-    "windows": { "nsis": { "installerHooks": null } }
+    "windows": {
+      "nsis": {
+        "installerHooks": null
+      }
+    },
+    "createUpdaterArtifacts": false
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": []
+    }
   }
 }
