@@ -48,3 +48,7 @@ aufforderung ist nichts zu tun.
 ## Lizenzen der Bausteine
 
 PDF.js (Apache-2.0), Tauri (MIT/Apache-2.0). MuPDF wird bewusst nicht verwendet — AGPL.
+
+## Lizenz
+
+MIT, siehe [LICENSE](LICENSE).
