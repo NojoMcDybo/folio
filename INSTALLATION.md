@@ -74,9 +74,3 @@ npm run installer:build
 Ausgabe: `src-tauri/target/release/bundle/nsis/Folio_0.8.4_x64-setup.exe`.
 Beim ersten Build wird der offizielle Microsoft-WebView2-Offline-Installer
 heruntergeladen; er bleibt danach im lokalen Tauri-Cache.
-
-## Arbeitsstand
-
-Diese Änderungen liegen in `D:\Dev\folio-installer` auf `codex/library-installer`,
-ausgehend von `1dff679`. Die zuvor ungespeicherten neuen Symbole und PDF-Registrierungen
-aus `D:\Dev\folio` wurden übernommen. Das Ausgangsverzeichnis wurde nicht bearbeitet.
