@@ -1,7 +1,7 @@
 {
   "name": "folio",
   "private": true,
-  "version": "0.8.3",
+  "version": "0.8.4",
   "type": "module",
   "scripts": {
     "installer:build": "tauri build --bundles nsis",
@@ -14,10 +14,10 @@
     "testapp:build": "tauri build --config src-tauri/tauri.test.conf.json"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2",
+    "@tauri-apps/api": "~2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.3",
     "@tauri-apps/plugin-opener": "^2",
-    "@tauri-apps/plugin-updater": "^2.13.1",
+    "@tauri-apps/plugin-updater": "~2.12.0",
     "pdfjs-dist": "^6.3.289"
   },
   "devDependencies": {
