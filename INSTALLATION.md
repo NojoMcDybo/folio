@@ -2,7 +2,7 @@
 
 ## Installation
 
-`Folio_0.8.2_x64-setup.exe` installiert Folio auf Windows 10 und 11 (64 Bit, Intel/AMD).
+`Folio_0.8.3_x64-setup.exe` installiert Folio auf Windows 10 und 11 (64 Bit, Intel/AMD).
 Die benötigte Microsoft-WebView2-Laufzeit ist im Paket enthalten. Zur Installation
 ist keine Internetverbindung nötig. Eine bereits vorhandene Laufzeit wird verwendet.
 
@@ -19,9 +19,22 @@ deshalb beim Start eine SmartScreen-Meldung anzeigen.
 
 ## Aktualisieren und deinstallieren
 
-Für ein Update Folio schließen und das neue Setup starten. Bibliothek und
-Einstellungen bleiben bei einem normalen Update erhalten. Ältere Versionen werden
-vom Installer nicht über eine neuere Version installiert.
+Ab 0.8.3 prüft Folio 15 s nach dem Start und danach alle 6 h, ob es auf GitHub eine
+neue Version gibt, und zeigt sie oben in der Bibliothek an. **Installieren** lädt das
+Update, prüft die Signatur (Schlüssel `plugins.updater.pubkey` in `tauri.conf.json`)
+und startet Folio danach neu. Vorher müssen alle Dokumentfenster geschlossen sein,
+damit keine ungesicherten Markierungen verloren gehen. Ein Update lädt den vollen
+Installer (mit WebView2, rund 210 MB).
+
+Ältere Versionen (bis 0.8.2) einmal von Hand aktualisieren: Folio schließen und das
+neue Setup von der Releases-Seite starten. Bibliothek und Einstellungen bleiben bei
+einem normalen Update erhalten. Ältere Versionen werden vom Installer nicht über eine
+neuere Version installiert.
+
+Neue Version veröffentlichen: Version in `package.json`, `src-tauri/Cargo.toml` und
+`src-tauri/tauri.conf.json` anheben, committen, Tag `v<version>` pushen. Der Workflow
+baut, signiert (Secret `TAURI_SIGNING_PRIVATE_KEY`) und lädt Installer und
+`latest.json` ins Release.
 
 Die Deinstallation erfolgt über **Windows-Einstellungen → Apps → Installierte Apps → Folio**.
 Persönliche App-Daten werden nur gelöscht, wenn dies im Deinstallationsdialog
@@ -58,7 +71,7 @@ npm ci
 npm run installer:build
 ```
 
-Ausgabe: `src-tauri/target/release/bundle/nsis/Folio_0.8.2_x64-setup.exe`.
+Ausgabe: `src-tauri/target/release/bundle/nsis/Folio_0.8.3_x64-setup.exe`.
 Beim ersten Build wird der offizielle Microsoft-WebView2-Offline-Installer
 heruntergeladen; er bleibt danach im lokalen Tauri-Cache.
 

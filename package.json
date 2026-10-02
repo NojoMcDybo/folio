@@ -1,7 +1,7 @@
 {
   "name": "folio",
   "private": true,
-  "version": "0.8.2",
+  "version": "0.8.3",
   "type": "module",
   "scripts": {
     "installer:build": "tauri build --bundles nsis",
@@ -17,6 +17,7 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.3",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-updater": "^2.13.1",
     "pdfjs-dist": "^6.3.289"
   },
   "devDependencies": {

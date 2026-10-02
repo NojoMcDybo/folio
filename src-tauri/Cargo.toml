@@ -1,6 +1,6 @@
 [package]
 name = "folio"
-version = "0.8.2"
+version = "0.8.3"
 description = "PDF-Reader mit Markierung, Farbinvertierung und Glasoberflaeche"
 authors = ["Nojo"]
 edition = "2021"
@@ -20,6 +20,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tauri-plugin-updater = "2"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"

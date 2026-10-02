@@ -21,6 +21,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { WebviewWindow, getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
+import { initUpdater } from "./updater";
 
 /** Die Bibliothek laeuft im Hauptfenster, jedes Dokument in einem
  *  eigenen. Welche Rolle dieses Fenster hat, steht in der Adresse. */
@@ -1264,6 +1265,7 @@ if (IS_READER) {
 } else {
   reader.remove();
   renderHome();
+  initUpdater($<HTMLElement>("update-banner"));
   // Die Bibliothek verteilt eintreffende Dateien an Dokumentfenster.
   void listen<string>("folio://open", (e) => { if (e.payload) void openDoc(e.payload); });
   void invoke<string | null>("startup_file").then((p) => { if (p) void openDoc(p); });

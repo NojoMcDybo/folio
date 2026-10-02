@@ -36,15 +36,31 @@ jobs:
       - run: npm ci --include=dev
       - run: npm run test:scroll
       - run: npm run installer:build
-      - name: Release anlegen und Installer hochladen
+        env:
+          # signiert das Update (.sig); den passenden oeffentlichen Schluessel prueft die App
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+      - name: Release anlegen, Installer und latest.json hochladen
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           $exe = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
           $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLower()
+          $version = $env:TAG.TrimStart('v')
+          # latest.json: die installierten Apps fragen .../releases/latest/download/latest.json ab
+          @{
+            version   = $version
+            pub_date  = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+            platforms = @{
+              'windows-x86_64' = @{
+                signature = (Get-Content "$($exe.FullName).sig" -Raw).Trim()
+                url       = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:TAG/$($exe.Name)"
+              }
+            }
+          } | ConvertTo-Json -Depth 5 | Set-Content latest.json
           gh release view $env:TAG *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $env:TAG --target $env:GITHUB_SHA --title "Folio $($env:TAG.TrimStart('v'))" --notes "Windows-Installer (x64, NSIS). WebView2 ist offline enthalten.`n`nSHA-256: ``$hash``"
+            gh release create $env:TAG --target $env:GITHUB_SHA --title "Folio $version" --notes "Windows-Installer (x64, NSIS). WebView2 ist offline enthalten. Ab 0.8.3 meldet Folio neue Versionen selbst in der Bibliothek.`n`nSHA-256: ``$hash``"
           }
-          gh release upload $env:TAG $exe.FullName --clobber
+          gh release upload $env:TAG $exe.FullName latest.json --clobber
