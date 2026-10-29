@@ -1,6 +1,6 @@
 [package]
 name = "folio"
-version = "0.8.4"
+version = "0.13.0"
 description = "PDF-Reader mit Markierung, Farbinvertierung und Glasoberflaeche"
 authors = ["Nojo"]
 edition = "2021"
@@ -21,6 +21,8 @@ tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-updater = "2"
+folio-pdfops = { path = "pdfops" }
+tauri-plugin-drag = "2.1.1"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"
@@ -31,5 +33,14 @@ windows = { version = "0.61.3", features = [
   "Win32_Storage_FileSystem",
   "Win32_System_Com",
   "Win32_UI_Shell",
+  "Win32_System_WinRT",
+  "Foundation",
+  "Globalization",
+  "Graphics_Imaging",
+  "Media_Ocr",
+  "Storage_Streams",
 ] }
 windows-core = "0.61.2"
+
+[workspace]
+members = ["pdfops"]

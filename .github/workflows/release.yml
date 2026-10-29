@@ -34,7 +34,8 @@ jobs:
           }
           "tag=$tag" >> $env:GITHUB_OUTPUT
       - run: npm ci --include=dev
-      - run: npm run test:scroll
+      - run: npm test
+      - run: cargo test --manifest-path src-tauri/Cargo.toml -p folio-pdfops
       - run: npm run installer:build
         env:
           # signiert das Update (.sig); den passenden oeffentlichen Schluessel prueft die App

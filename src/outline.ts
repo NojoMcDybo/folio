@@ -1,8 +1,26 @@
 import type { PDFDocumentProxy } from "pdfjs-dist";
+import { detectDocumentOutline } from "./outline-detect";
+import type { Detected } from "./toc-detect";
 
-type OutlineItem = NonNullable<Awaited<ReturnType<PDFDocumentProxy["getOutline"]>>>[number];
-type Destination = { pageNumber: number; destination: unknown[] };
+type PdfOutlineItem = NonNullable<Awaited<ReturnType<PDFDocumentProxy["getOutline"]>>>[number];
+/** Ein erkannter Eintrag: die Seite steht schon fest, es gibt kein PDF-Ziel aufzuloesen. */
+type DetectedNode = { title: string; pageNumber: number; items: DetectedNode[] };
+type OutlineItem = Omit<PdfOutlineItem, "items" | "dest"> & { dest?: PdfOutlineItem["dest"]; pageNumber?: number; items?: OutlineItem[] };
+type Destination = { pageNumber: number; destination: unknown[] | null };
 type Row = { button: HTMLButtonElement; page: number | null };
+
+/** Flache Liste mit Ebenen zu einem Baum. */
+function nest(flat: Detected["items"]): OutlineItem[] {
+  const root: DetectedNode = { title: "", pageNumber: 0, items: [] };
+  const stack: Array<{ level: number; node: DetectedNode }> = [{ level: 0, node: root }];
+  for (const it of flat) {
+    while (stack.length > 1 && stack[stack.length - 1].level >= it.level) stack.pop();
+    const node: DetectedNode = { title: it.title, pageNumber: it.page, items: [] };
+    stack[stack.length - 1].node.items.push(node);
+    stack.push({ level: it.level, node });
+  }
+  return root.items as unknown as OutlineItem[];
+}
 
 export class OutlinePanel {
   private doc: PDFDocumentProxy | null = null;
@@ -66,6 +84,21 @@ export class OutlinePanel {
     }
   }
 
+  /** Erkennt ein Inhaltsverzeichnis; zeigt dabei den Fortschritt im Statusfeld. */
+  private async detectOutline(doc: PDFDocumentProxy, generation: number): Promise<Detected | null> {
+    this.status.hidden = false;
+    this.status.textContent = "Keine Lesezeichen in der PDF – Kapitel werden gesucht …";
+    try {
+      return await detectDocumentOutline(
+        doc,
+        (f) => { if (generation === this.generation) this.status.textContent = `Kapitel werden gesucht … ${Math.round(f * 100)} %`; },
+        () => generation !== this.generation,
+      );
+    } catch {
+      return null;
+    }
+  }
+
   private async load() {
     const doc = this.doc!;
     const generation = this.generation;
@@ -75,11 +108,21 @@ export class OutlinePanel {
     try {
       const [items, labels] = await Promise.all([doc.getOutline(), doc.getPageLabels().catch(() => null)]);
       if (generation !== this.generation) return;
-      if (!items?.length) {
-        this.status.textContent = "Diese PDF enthält keine Lesezeichen. Ein gedrucktes Inhaltsverzeichnis wird hier noch nicht automatisch erkannt.";
-        return;
+      let entries: OutlineItem[] | null = items as OutlineItem[] | null;
+      let note = "";
+      if (!entries?.length) {
+        const detected = await this.detectOutline(doc, generation);
+        if (generation !== this.generation) return;
+        if (!detected) {
+          this.status.textContent = "Diese PDF enthält keine Lesezeichen, und ein Inhaltsverzeichnis ließ sich nicht erkennen.";
+          return;
+        }
+        entries = nest(detected.items);
+        note = detected.source === "printed"
+          ? "Aus dem gedruckten Inhaltsverzeichnis erkannt – bitte stichprobenartig prüfen."
+          : "Aus den Überschriften erkannt – bitte stichprobenartig prüfen.";
       }
-      this.status.hidden = true;
+      if (note) { this.status.textContent = note; this.status.hidden = false; } else this.status.hidden = true;
       const pending: Array<() => Promise<void>> = [];
       const destinations = new Map<OutlineItem["dest"], Promise<Destination | null>>();
       const resolve = (dest: OutlineItem["dest"]) => {
@@ -116,7 +159,18 @@ export class OutlinePanel {
           number.className = "outline-page";
           button.append(title, number); line.appendChild(button); li.appendChild(line);
           const row: Row = { button, page: null }; this.rows.push(row);
-          if (item.dest === null || item.dest === undefined) {
+          if (item.pageNumber !== undefined) {
+            // Erkannter Eintrag: Seite bekannt, nichts aufzuloesen.
+            const target: Destination = { pageNumber: item.pageNumber, destination: null };
+            row.page = item.pageNumber;
+            number.textContent = labels?.[item.pageNumber - 1] || String(item.pageNumber);
+            number.title = `PDF-Seite ${item.pageNumber}`;
+            button.addEventListener("click", () => {
+              this.navigation++;
+              this.navigate(target);
+              if (innerWidth <= 620) this.close(true);
+            });
+          } else if (item.dest === null || item.dest === undefined) {
             button.disabled = true;
             button.title = item.url ? "Externes Lesezeichen – kein Kapitelziel in dieser PDF" : "Kein Seitenziel hinterlegt";
           } else {
@@ -159,7 +213,7 @@ export class OutlinePanel {
         }
         return ul;
       };
-      this.list.replaceChildren(render(items, 0));
+      this.list.replaceChildren(render(entries!, 0));
       // Bound metadata requests; never block opening a long book on all destinations.
       let next = 0;
       await Promise.all(Array.from({ length: Math.min(4, pending.length) }, async () => {

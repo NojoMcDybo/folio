@@ -1,0 +1,141 @@
+diff --git a/src-tauri/src/convert.rs b/src-tauri/src/convert.rs
+index 3f0979c..f513399 100644
+--- a/src-tauri/src/convert.rs
++++ b/src-tauri/src/convert.rs
+@@ -87,6 +87,12 @@ pub fn convert_targets(path: String) -> Vec<Target> {
+         ],
+         "audio" if ff => vec![t("mp3", "MP3"), t("m4a", "M4A"), t("wav", "WAV"), t("flac", "FLAC"), t("ogg", "OGG")],
+         "video" if ff => vec![t("mp4", "MP4"), t("gif", "GIF"), t("mp3", "MP3")],
++        // PDFs verkleinert und entfärbt Folio (`folio --compress|--gray`, ohne Fenster).
++        "doc" if own == "pdf" && folio().is_some() => vec![
++            t("pdf-mail", "Komprimieren · E-Mail"),
++            t("pdf-screen", "Komprimieren · klein"),
++            t("pdf-gray", "Schwarzweiß"),
++        ],
+         _ => vec![],
+     };
+     list.into_iter().filter(|x| x.id != own).collect()
+@@ -147,6 +153,56 @@ fn image_convert(src: &Path, target: &str, out: &Path) -> Result<(), String> {
+     }
+ }
+ 
++/// Folio suchen: `FOLIO_EXE`, die Installation im Benutzerordner (NSIS currentUser), Programme.
++fn find_folio() -> Option<PathBuf> {
++    let mut c: Vec<PathBuf> = Vec::new();
++    if let Some(p) = std::env::var_os("FOLIO_EXE") {
++        c.push(PathBuf::from(p));
++    }
++    if let Some(l) = std::env::var_os("LOCALAPPDATA") {
++        let l = PathBuf::from(l);
++        c.push(l.join("Folio").join("folio.exe"));
++        c.push(l.join("Programs").join("Folio").join("folio.exe"));
++    }
++    if let Some(p) = std::env::var_os("ProgramFiles") {
++        c.push(PathBuf::from(p).join("Folio").join("folio.exe"));
++    }
++    c.into_iter().find(|p| p.is_file())
++}
++
++static FOLIO_CACHE: Mutex<Option<PathBuf>> = Mutex::new(None);
++fn folio() -> Option<PathBuf> {
++    let mut c = FOLIO_CACHE.lock().unwrap();
++    if c.is_none() {
++        *c = find_folio();
++    }
++    c.clone()
++}
++
++/// Folio ohne Fenster aufrufen. Es schreibt nach `out` (nie ueber eine vorhandene Datei) und
++/// meldet auf stdout JSON mit `before`/`after`; Rueckgabe ist die kurze Statuszeile.
++fn folio_convert(src: &Path, target: &str, out: &Path) -> Result<String, String> {
++    let exe = folio().ok_or("Folio fehlt")?;
++    let mut c = Command::new(exe);
++    match target {
++        "pdf-mail" => c.args(["--compress"]).arg(src).args(["--preset", "mail"]),
++        "pdf-screen" => c.args(["--compress"]).arg(src).args(["--preset", "screen"]),
++        "pdf-gray" => c.args(["--gray"]).arg(src),
++        _ => return Err("unbekanntes Ziel".into()),
++    };
++    let o = c.arg("--out").arg(out).creation_flags(CREATE_NO_WINDOW).output().map_err(|e| e.to_string())?;
++    if !o.status.success() {
++        let _ = std::fs::remove_file(out);
++        return Err(String::from_utf8_lossy(&o.stderr).lines().next().unwrap_or("Folio-Fehler").to_string());
++    }
++    let report: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap_or_default();
++    let mb = |k: &str| report[k].as_f64().map(|b| b / 1_048_576.0);
++    Ok(match (mb("before"), mb("after")) {
++        (Some(a), Some(b)) => format!("fertig · {a:.1} MB → {b:.1} MB"),
++        _ => "fertig".to_string(),
++    })
++}
++
+ fn ffmpeg_convert(src: &Path, target: &str, out: &Path, video: bool) -> Result<(), String> {
+     let ff = ffmpeg().ok_or("ffmpeg fehlt")?;
+     let mut c = Command::new(ff);
+@@ -170,6 +226,15 @@ fn ffmpeg_convert(src: &Path, target: &str, out: &Path, video: bool) -> Result<(
+     }
+ }
+ 
++/// Namenszusatz fuer die PDF-Ziele ("Bericht (komprimiert).pdf").
++fn pdf_suffix(target: &str) -> Option<&'static str> {
++    match target {
++        "pdf-mail" | "pdf-screen" => Some("komprimiert"),
++        "pdf-gray" => Some("schwarzweiß"),
++        _ => None,
++    }
++}
++
+ static JOB: AtomicU64 = AtomicU64::new(0);
+ 
+ #[tauri::command]
+@@ -181,12 +246,19 @@ pub fn convert(app: AppHandle, path: String, target: String) -> Result<(), Strin
+     let stem = src.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+     let out = if target == "small" {
+         unique(&dir, &format!("{stem}-klein"), norm(&ext))
++    } else if let Some(word) = pdf_suffix(&target) {
++        unique(&dir, &format!("{stem} ({word})"), "pdf")
+     } else {
+         unique(&dir, &stem, &target)
+     };
+     let id = format!("notch:convert:{}", JOB.fetch_add(1, Ordering::Relaxed));
+     let name = src.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+-    let label = if target == "small" { "kleiner".to_string() } else { target.to_uppercase() };
++    let label = match target.as_str() {
++        "small" => "kleiner".to_string(),
++        "pdf-mail" | "pdf-screen" => "komprimiert".to_string(),
++        "pdf-gray" => "schwarzweiß".to_string(),
++        t => t.to_uppercase(),
++    };
+     let icon = Some("⇄".to_string());
+ 
+     activities::upsert(
+@@ -205,14 +277,15 @@ pub fn convert(app: AppHandle, path: String, target: String) -> Result<(), Strin
+     );
+ 
+     std::thread::spawn(move || {
+-        let r = match kind {
+-            "image" => image_convert(&src, &target, &out),
+-            "audio" => ffmpeg_convert(&src, &target, &out, false),
+-            "video" => ffmpeg_convert(&src, &target, &out, true),
++        let r: Result<String, String> = match kind {
++            "image" => image_convert(&src, &target, &out).map(|()| "fertig".to_string()),
++            "audio" => ffmpeg_convert(&src, &target, &out, false).map(|()| "fertig".to_string()),
++            "video" => ffmpeg_convert(&src, &target, &out, true).map(|()| "fertig".to_string()),
++            "doc" if pdf_suffix(&target).is_some() => folio_convert(&src, &target, &out),
+             _ => Err("Format wird nicht unterstuetzt".into()),
+         };
+         match r {
+-            Ok(()) => {
++            Ok(status) => {
+                 crate::shelf::add_one(&app, &out);
+                 let out_s = out.to_string_lossy().to_string();
+                 let out_name = out.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+@@ -222,7 +295,7 @@ pub fn convert(app: AppHandle, path: String, target: String) -> Result<(), Strin
+                         id,
+                         app: "Konvertieren".into(),
+                         title: out_name,
+-                        subtitle: Some("fertig".into()),
++                        subtitle: Some(status),
+                         icon,
+                         color: Some("#5ee38a".into()),
+                         progress: Some(1.0),

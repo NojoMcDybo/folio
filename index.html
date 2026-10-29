@@ -39,6 +39,7 @@
           <nav id="outline-list" aria-label="PDF-Kapitel"></nav>
         </div>
       </aside>
+      <button id="b-view" class="ico glass solo drag" title="Ansicht · Seitenleiste Strg+B" aria-expanded="false" aria-controls="view-menu"></button>
       <button id="b-find" class="ico glass solo drag" title="Suchen · Strg+F"></button>
       <button id="b-invert" class="ico glass solo drag" title="Invertieren · Strg+I"></button>
 
@@ -58,6 +59,38 @@
         <button id="a-toggle" class="ico glass solo" title="Anmerkungen" aria-expanded="false"></button>
         <button id="t-text" class="ico glass solo side" title="Textfeld · T"></button>
         <button id="swatch" class="glass solo side" title="Stiftfarben" aria-label="Stiftfarben" aria-expanded="false" aria-controls="color-panel"><span class="swatch-dot"></span></button>
+      </div>
+
+      <!-- Seitenleiste: nur Miniaturen. Wird per Griff/Randstreifen/Wischen ein- und ausgefahren. -->
+      <aside id="thumbs" aria-label="Seiten" inert aria-hidden="true"><div id="thumb-list"></div></aside>
+      <div id="thumbs-edge"></div>
+      <div id="thumbs-grip" role="button" tabindex="0" aria-label="Seitenleiste ein- oder ausblenden" aria-expanded="false" title="Seitenleiste · Strg+B"><span></span></div>
+
+      <section id="view-menu" role="dialog" aria-label="Ansicht" hidden>
+        <div id="view-modes" role="radiogroup" aria-label="Seitenanordnung">
+          <button type="button" role="radio" data-mode="continuous" aria-checked="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="8" rx="1.5"/><rect x="7" y="13.5" width="10" height="8" rx="1.5"/></svg><span>Fortlaufend</span></button>
+          <button type="button" role="radio" data-mode="single" aria-checked="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="3" width="11" height="18" rx="1.5"/></svg><span>Einzelseite</span></button>
+          <button type="button" role="radio" data-mode="double" aria-checked="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4" width="9" height="16" rx="1.5"/><rect x="12.5" y="4" width="9" height="16" rx="1.5"/></svg><span>Doppelseite</span></button>
+        </div>
+        <button type="button" id="view-sheet" class="vm-row"><span class="vm-label">Kontaktbogen</span><kbd>K</kbd></button>
+        <button type="button" id="view-sidebar" class="vm-row"><span class="vm-label">Seitenleiste</span><kbd>Strg+B</kbd></button>
+        <button type="button" id="view-pages" class="vm-row"><span class="vm-label">Seiten bearbeiten …</span><kbd>›</kbd></button>
+        <button type="button" id="view-optimize" class="vm-row"><span class="vm-label">Verkleinern und umwandeln …</span><kbd>›</kbd></button>
+        <button type="button" id="view-sign" class="vm-row"><span class="vm-label">Unterschreiben …</span><kbd>Strg+Umschalt+U</kbd></button>
+        <button type="button" id="view-ocr" class="vm-row" role="menuitemcheckbox" aria-checked="true"><span class="vm-label">Text in Bildern automatisch erkennen</span><kbd></kbd></button>
+        <button type="button" id="view-ocr-now" class="vm-row"><span class="vm-label">Text auf dieser Seite erkennen</span><kbd></kbd></button>
+        <button type="button" id="view-ocr-embed" class="vm-row" hidden><span class="vm-label">Erkannten Text ins PDF einbetten</span><kbd></kbd></button>
+        <button type="button" id="view-bookmark" class="vm-row"><span class="vm-label">Lesezeichen setzen</span><kbd>Strg+D</kbd></button>
+        <div id="view-bookmarks" hidden></div>
+      </section>
+
+      <div id="page-menu" role="menu" aria-label="Seiten" hidden></div>
+      <div id="text-menu" role="menu" aria-label="Text" hidden></div>
+      <div id="ocr-chip" class="glass" role="status" hidden></div>
+
+      <div id="sheet" hidden role="dialog" aria-label="Kontaktbogen">
+        <header data-tauri-drag-region><h2>Alle Seiten</h2><button id="sheet-close" class="ico sm" title="Schließen · Esc"></button></header>
+        <div id="sheet-grid"></div>
       </div>
 
       <section id="color-panel" role="dialog" aria-labelledby="color-heading" hidden>
@@ -94,6 +127,18 @@
       <p id="library-delete-description">Die Datei und ihr Bibliothekseintrag werden entfernt. Die PDF lässt sich anschließend über den Windows-Papierkorb wiederherstellen.</p>
       <p id="library-delete-error" role="alert"></p>
       <div class="askrow"><button id="library-delete-cancel" autofocus>Abbrechen</button><button id="library-delete-confirm">In den Papierkorb</button></div>
+    </dialog>
+
+    <dialog id="crop" aria-label="Seite zuschneiden"></dialog>
+
+    <dialog id="sign" aria-label="Unterschreiben"></dialog>
+    <dialog id="optimize" aria-label="Verkleinern und umwandeln"></dialog>
+
+    <dialog id="merge-ask" aria-labelledby="merge-ask-title">
+      <h2 id="merge-ask-title">PDFs zusammenführen?</h2>
+      <p id="merge-ask-text"></p>
+      <p id="merge-ask-error" role="alert"></p>
+      <div class="askrow"><button id="merge-ask-cancel" autofocus>Abbrechen</button><button id="merge-ask-single">Einzeln öffnen</button><button id="merge-ask-merge">Zusammenführen</button></div>
     </dialog>
 
     <dialog id="ask" aria-labelledby="asktext" hidden>
