@@ -49,6 +49,62 @@ impl FileState {
         save_atomically(&canonical, bytes)
     }
 
+    /// Liest eine PDF, ohne sie als geoeffnet zu fuehren: fuer Seiten, die in ein anderes
+    /// Dokument eingefuegt werden. Geoeffnet bleibt nur, was ein Fenster wirklich zeigt.
+    pub(crate) fn read_plain(&self, path: &str) -> Result<Vec<u8>, String> {
+        let canonical = validate_pdf_path(path, false)?;
+        std::fs::read(&canonical).map_err(|error| format!("{}: {error}", canonical.display()))
+    }
+
+    /// Schreibt eine Kopie unter einem vom Benutzer gewaehlten Pfad. Eine neue Datei wird nur
+    /// angelegt (nie ueberschrieben); eine vorhandene PDF atomar ersetzt - ausser sie ist in einem
+    /// Folio-Fenster geoeffnet, dann wuerde die Kopie dem offenen Dokument die Datei wegnehmen.
+    pub(crate) fn write_copy(&self, path: &str, bytes: &[u8]) -> Result<(), String> {
+        let registry = self
+            .inner
+            .lock()
+            .map_err(|_| "Interner Dateizustand ist nicht verfuegbar".to_string())?;
+        let target = Path::new(path);
+        if !target.is_absolute() {
+            return Err("Der Zielpfad muss absolut sein".into());
+        }
+        if target
+            .components()
+            .any(|component| matches!(component, Component::ParentDir | Component::CurDir))
+        {
+            return Err("Relative Pfadsegmente sind nicht erlaubt".into());
+        }
+        reject_special_windows_prefix(target)?;
+        let is_pdf = target
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("pdf"));
+        if !is_pdf {
+            return Err("Nur PDF-Dateien sind erlaubt".into());
+        }
+        match std::fs::symlink_metadata(target) {
+            Ok(_) => {
+                let canonical = validate_pdf_path(path, true)?;
+                if registry
+                    .open_by_window
+                    .values()
+                    .any(|open| paths_equal(open, &canonical))
+                {
+                    return Err("Die Zieldatei ist in einem Folio-Fenster geoeffnet.".into());
+                }
+                save_atomically(&canonical, bytes)
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                if !target.parent().is_some_and(Path::is_dir) {
+                    return Err("Der Zielordner existiert nicht".into());
+                }
+                folio_pdfops::files::create_new_file(target, bytes)
+                    .map_err(|error| format!("{}: {error}", target.display()))
+            }
+            Err(error) => Err(format!("Zieldatei nicht zugaenglich: {error}")),
+        }
+    }
+
     pub(crate) fn recycle(&self, path: &str) -> Result<(), String> {
         let registry = self
             .inner

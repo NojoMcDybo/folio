@@ -1,5 +1,6 @@
 mod file_safety;
 mod notch;
+mod pdf_tools;
 
 use file_safety::{decode_hex_path, FileState};
 use std::path::PathBuf;
@@ -88,6 +89,12 @@ pub fn run() {
 
     builder
         .manage(FileState::default())
+        .setup(|_| {
+            // Erst hier, nicht vor dem Builder: ein zweiter Start beendet sich schon im
+            // Single-Instance-Plugin und darf der laufenden Instanz die Ablage nicht wegraeumen.
+            pdf_tools::clean_temp();
+            Ok(())
+        })
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 window.state::<FileState>().forget_window(window.label());
@@ -95,12 +102,19 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             read_pdf,
             save_pdf,
             recycle_pdf,
             startup_file,
+            pdf_tools::pdf_edit,
+            pdf_tools::read_pdf_plain,
+            pdf_tools::write_pdf_copy,
+            pdf_tools::temp_file,
+            pdf_tools::library_pdf,
+            pdf_tools::adopt_temp_pdf,
             notch::notch_send,
             notch::notch_events
         ])

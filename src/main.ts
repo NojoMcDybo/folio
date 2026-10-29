@@ -18,10 +18,16 @@ import { ViewMenu } from "./view-menu";
 import { VIEW_MODES, isPaged, loadViewMode, saveViewMode, type ViewMode } from "./view-modes";
 import { ColorPalette } from "./color-palette";
 import { LibraryActions } from "./library-actions";
-import { notchClosed, notchOnSearch, notchReading, notchSearchState } from "./notch";
+import { notchClosed, notchOnSearch, notchReading, notchSearchState, notchShelf } from "./notch";
+import { PageEditor, documentBytes, type BookmarkChange } from "./page-editor";
+import { PageMenu, type MenuItem } from "./page-menu";
+import { CropDialog, cropEdits } from "./crop";
+import { describePages } from "./page-ops";
+import { mergeBytes } from "./merge";
+import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -312,6 +318,9 @@ const outlinePanel = new OutlinePanel(
   () => suspendScrolling(),
 );
 let zoomBeforeFit: number | null = null;
+/** Nach einer Seitenoperation bleibt der Zoom, statt auf die Ausgangsbreite zurueckzuspringen. */
+let keepScale: number | null = null;
+let annotationEdited = false;
 let viewMode: ViewMode = loadViewMode();
 
 const bookmarks = new Bookmarks(() => { sidebar?.refreshBookmarks(); refreshViewMenu(); });
@@ -324,6 +333,10 @@ const sidebar = new PageSidebar({
   wheelHost: container,
   go: goToPage,
   isBookmarked: (page) => bookmarks.has(page),
+  onMove: (pages, to) => void editor.movePages(pages, to),
+  onContextMenu: (_pages, x, y) => openPageMenu(x, y),
+  onNearEdge: (pages) => prepareDrag(pages),
+  onDragOut: (pages) => void dragOut(pages),
 });
 const sheet = new ContactSheet(
   $<HTMLElement>("sheet"), $<HTMLElement>("sheet-grid"), $<HTMLElement>("sheet-close"),
@@ -338,6 +351,7 @@ const viewMenu = new ViewMenu(
     sidebar: () => sidebar.toggle(),
     toggleBookmark,
     goTo: goToPage,
+    pages: (x, y) => openPageMenu(x, y),
   },
 );
 viewMenu.setMode(viewMode);
@@ -430,9 +444,200 @@ function markDirty(state: boolean) {
   btnSave.hidden = !state;
 }
 
+
+// ---------- Seiten bearbeiten ----------
+
+const PDF_FILTER = [{ name: "PDF", extensions: ["pdf"] }];
+const pageMenu = new PageMenu($<HTMLElement>("page-menu"));
+const cropDialog = new CropDialog($<HTMLDialogElement>("crop"));
+
+const editor = new PageEditor({
+  doc: () => pdfViewer.pdfDocument,
+  currentPage: () => pdfViewer.currentPageNumber,
+  bookmarks: () => bookmarks.list(),
+  replace: replaceDocument,
+  edit: async (bytes, edits) =>
+    new Uint8Array(await invoke<ArrayBuffer>("pdf_edit", bytes, { headers: { "x-edits": JSON.stringify(edits) } })),
+  busy: (on) => {
+    reader.inert = on;
+    document.body.classList.toggle("working", on);
+    if (on) suspendScrolling();
+  },
+  say,
+  isDirty: () => dirty,
+  setDirty: (state) => markDirty(state),
+  changed: () => {},
+});
+
+/** Das offene Dokument durch neue Bytes ersetzen (Seitenoperation, Rueckgaengig, Wiederholen). */
+async function replaceDocument(bytes: Uint8Array, page: number, change: BookmarkChange) {
+  // PDF.js darf den Puffer uebernehmen; die Momentaufnahme des Verlaufs bleibt unberuehrt.
+  const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const kept = "map" in change ? sidebar.selection().map(change.map).filter((p): p is number => p !== null) : [];
+  keepScale = pdfViewer.currentScale;
+  pendingPage = Math.min(Math.max(1, page), doc.numPages);
+  attachDocument(doc);
+  bookmarks.rekey(doc.fingerprints[0] ?? null, change, doc.numPages);
+  sidebar.setSelection(kept);
+  glass?.invalidate();
+  if (currentPath) {
+    touchRecent({ path: currentPath, pages: doc.numPages, page: pendingPage });
+    void notchReading(currentPath, pendingPage, doc.numPages);
+  }
+}
+
+/** Ausdruecklich markierte Seiten, sonst die gerade angezeigte. */
+function targetPages(): number[] {
+  const marked = sidebar.selection();
+  return marked.length ? marked : [pdfViewer.currentPageNumber];
+}
+
+const rotatePages = (degrees: number) => void editor.rotate(targetPages(), degrees);
+
+function deletePages() {
+  void editor.deletePages(targetPages());
+}
+
+async function cropPages() {
+  const doc = pdfViewer.pdfDocument;
+  if (!doc || editor.busy) return;
+  try {
+    const request = await cropDialog.open(doc, targetPages()[0], sidebar.selection());
+    if (!request) return;
+    await editor.crop(await cropEdits(doc, request));
+  } catch (error) {
+    say("Zuschneiden fehlgeschlagen: " + String(error));
+  }
+}
+
+async function insertPaths(paths: string[], after: number) {
+  const pdfs = paths.filter((p) => /\.pdf$/i.test(p));
+  if (!pdfs.length || !pdfViewer.pdfDocument) return;
+  try {
+    const parts: Uint8Array[] = [];
+    let pages = 0;
+    for (const path of pdfs) {
+      const bytes = new Uint8Array(await invoke<ArrayBuffer>("read_pdf_plain", { path }));
+      const probe = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+      pages += probe.numPages;
+      void probe.loadingTask.destroy();
+      parts.push(bytes);
+    }
+    if (await editor.insert(parts, after, pages)) say(pages === 1 ? "Seite eingefügt" : `${pages} Seiten eingefügt`);
+  } catch (error) {
+    say("Einfügen fehlgeschlagen: " + String(error));
+  }
+}
+
+async function insertFromDialog(after: number) {
+  const chosen = await openDialog({ multiple: true, filters: PDF_FILTER });
+  await insertPaths(Array.isArray(chosen) ? chosen : typeof chosen === "string" ? [chosen] : [], after);
+}
+
+function pageFileName(pages: number[]) {
+  const stem = (currentPath ?? "Dokument").split(/[\\/]/).pop()!.replace(/\.pdf$/i, "");
+  return `${stem} – Seite ${describePages(pages)}.pdf`;
+}
+
+async function tempFile(name: string, bytes: Uint8Array) {
+  return invoke<string>("temp_file", bytes, { headers: { "x-name": hex(name) } });
+}
+
+async function extractToFile() {
+  const pages = targetPages();
+  const bytes = await editor.extract(pages);
+  if (!bytes) return;
+  const target = await saveDialog({ defaultPath: pageFileName(pages), filters: PDF_FILTER });
+  if (!target) return;
+  try {
+    await invoke("write_pdf_copy", bytes, { headers: { "x-path": hex(target) } });
+    say("Gesichert: " + (target.split(/[\\/]/).pop() ?? target));
+  } catch (error) {
+    say("Sichern fehlgeschlagen: " + String(error));
+  }
+}
+
+async function extractToShelf() {
+  const pages = targetPages();
+  const bytes = await editor.extract(pages);
+  if (!bytes) return;
+  try {
+    notchShelf([await tempFile(pageFileName(pages), bytes)]);
+    say("In der Notch-Ablage");
+  } catch (error) {
+    say("Ablegen fehlgeschlagen: " + String(error));
+  }
+}
+
+/** Kleines PNG der Miniatur als Zeigerbild fuer den nativen Drag. */
+async function previewPng(source: HTMLCanvasElement | null): Promise<string> {
+  const c = document.createElement("canvas");
+  c.width = 96;
+  c.height = source?.width ? Math.round((96 * source.height) / source.width) : 136;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, c.width, c.height);
+  if (source?.width) ctx.drawImage(source, 0, 0, c.width, c.height);
+  const blob = await new Promise<Blob | null>((resolve) => c.toBlob(resolve, "image/png"));
+  return tempFile("Vorschau.png", new Uint8Array(await blob!.arrayBuffer()));
+}
+
+/** Datei und Zeigerbild fuers Herausziehen. Wird schon vorbereitet, wenn der Zeiger sich dem
+ *  Fensterrand naehert: der native Drag muss losgehen, solange die Maustaste noch gedrueckt ist. */
+let dragPrep: { key: string; ready: Promise<{ file: string; icon: string } | null> } | null = null;
+
+function prepareDrag(pages: number[]) {
+  const key = pages.join(",");
+  if (dragPrep?.key === key) return;
+  const preview = sidebar.previewOf(pages[0]);
+  dragPrep = {
+    key,
+    ready: (async () => {
+      const bytes = await editor.extract(pages);
+      if (!bytes) return null;
+      return { file: await tempFile(pageFileName(pages), bytes), icon: await previewPng(preview) };
+    })().catch((error) => { say("Herausziehen fehlgeschlagen: " + String(error)); return null; }),
+  };
+}
+
+/** Seiten ueber den Fensterrand gezogen: als Datei an Explorer oder Bibliotheksfenster uebergeben. */
+async function dragOut(pages: number[]) {
+  prepareDrag(pages);
+  const prepared = await dragPrep!.ready;
+  dragPrep = null;
+  if (!prepared) return;
+  try {
+    await startDrag({ item: [prepared.file], icon: prepared.icon, mode: "copy" });
+  } catch (error) {
+    say("Herausziehen fehlgeschlagen: " + String(error));
+  }
+}
+
+function openPageMenu(x: number, y: number) {
+  if (!pdfViewer.pdfDocument) return;
+  const pages = targetPages();
+  const many = pages.length > 1;
+  const last = pages[pages.length - 1];
+  const items: MenuItem[] = [
+    { label: "Nach links drehen", kbd: "Strg+,", action: () => rotatePages(-90) },
+    { label: "Nach rechts drehen", kbd: "Strg+.", action: () => rotatePages(90) },
+    { label: "Zuschneiden …", action: () => void cropPages() },
+    { label: many ? `${pages.length} Seiten löschen` : `Seite ${pages[0]} löschen`, kbd: "Entf", danger: true, action: deletePages },
+    { separator: true },
+    { label: "PDF dahinter einfügen …", action: () => void insertFromDialog(last) },
+    { label: many ? "Seiten als PDF sichern …" : "Seite als PDF sichern …", action: () => void extractToFile() },
+    { label: "In die Notch-Ablage legen", action: () => void extractToShelf() },
+    { separator: true },
+    { label: editor.canUndo ? `Rückgängig: ${editor.undoLabel}` : "Rückgängig", kbd: "Strg+Z", disabled: !editor.canUndo, action: () => void editor.undo() },
+    { label: editor.canRedo ? `Wiederholen: ${editor.redoLabel}` : "Wiederholen", kbd: "Strg+Umschalt+Z", disabled: !editor.canRedo, action: () => void editor.redo() },
+  ];
+  pageMenu.open(items, x, y);
+}
+
 eventBus.on("pagesinit", () => {
   applyViewMode(viewMode, false);
-  fitOpen();
+  if (keepScale !== null) { pdfViewer.currentScale = keepScale; keepScale = null; }
+  else fitOpen();
   if (pendingPage > 1 && pendingPage <= pdfViewer.pagesCount) {
     pdfViewer.currentPageNumber = pendingPage;
   } else {
@@ -494,6 +699,28 @@ async function makeThumb(doc: pdfjsLib.PDFDocumentProxy): Promise<string> {
   }
 }
 
+/** Hängt ein geladenes Dokument an alle Ansichten (Seiten, Kapitel, Leiste). */
+function attachDocument(doc: pdfjsLib.PDFDocumentProxy) {
+  const old = pdfViewer.pdfDocument;
+  pdfViewer.setDocument(doc);
+  linkService.setDocument(doc, null);
+  outlinePanel.setDocument(doc);
+  sidebar.setDocument(doc);
+  sheet.close(false);
+  annotationEdited = false;
+
+  const storage = doc.annotationStorage as unknown as {
+    onSetModified: (() => void) | null;
+    onResetModified: (() => void) | null;
+  };
+  storage.onSetModified = () => { annotationEdited = true; markDirty(true); };
+  // PDF.js resets this while serializing, before native disk writing succeeds.
+  // Only our successful save (or explicit discard) may clear Folio's dirty flag.
+  storage.onResetModified = () => {};
+  // Das vorige Dokument gibt seinen Speicher im Worker frei.
+  if (old && old !== doc) void old.loadingTask.destroy().catch(() => {});
+}
+
 async function openPath(path: string) {
   try {
     const buf = await invoke<ArrayBuffer>("read_pdf", { path });
@@ -502,21 +729,9 @@ async function openPath(path: string) {
     pendingPage = known?.page ?? 1;
 
     const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
-    pdfViewer.setDocument(doc);
-    linkService.setDocument(doc, null);
-    outlinePanel.setDocument(doc);
-    sidebar.setDocument(doc);
-    sheet.close(false);
+    attachDocument(doc);
     bookmarks.setDocument(doc.fingerprints[0] ?? null, doc.numPages);
-
-    const storage = doc.annotationStorage as unknown as {
-      onSetModified: (() => void) | null;
-      onResetModified: (() => void) | null;
-    };
-    storage.onSetModified = () => markDirty(true);
-    // PDF.js resets this while serializing, before native disk writing succeeds.
-    // Only our successful save (or explicit discard) may clear Folio's dirty flag.
-    storage.onResetModified = () => {};
+    editor.reset();
 
     currentPath = path;
     markDirty(false);
@@ -614,9 +829,11 @@ async function performSave(): Promise<boolean> {
   suspendScrolling();
   $<HTMLElement>("ask-error").textContent = "";
   try {
-    const bytes: Uint8Array = await doc.saveDocument();
+    const bytes: Uint8Array = await documentBytes(doc);
     await invoke("save_pdf", bytes, { headers: { "x-path": hex(path) } });
     doc.annotationStorage.resetModified();
+    annotationEdited = false;
+    editor.markSaved();
     markDirty(false);
     // Thumbnail failure must not turn a completed disk write into a save error.
     void makeThumb(doc).then(thumb => { if (thumb) touchRecent({ path, thumb }); });
@@ -1196,6 +1413,19 @@ window.addEventListener("keydown", (e) => {
   if (ctrl && k === "o") { e.preventDefault(); void pick(); }
   else if (ctrl && k === "b") { e.preventDefault(); sidebar.toggle(); }
   else if (ctrl && k === "d") { e.preventDefault(); toggleBookmark(); }
+  // Seiten-Rueckgaengig gilt, solange nach der letzten Seitenoperation nichts markiert/gezeichnet
+  // wurde - sonst gehoert Strg+Z dem Stift und den Textfeldern (PDF.js' eigener Verlauf).
+  else if (ctrl && (k === "z" || k === "y") && !typing && tool === "none" && !annotationEdited && (editor.canUndo || editor.canRedo)) {
+    e.preventDefault();
+    e.stopPropagation();
+    void (k === "y" || e.shiftKey ? editor.redo() : editor.undo());
+  }
+  else if (ctrl && e.key === ".") { e.preventDefault(); rotatePages(90); }
+  else if (ctrl && e.key === ",") { e.preventDefault(); rotatePages(-90); }
+  else if (e.key === "Delete" && !ctrl && !typing && ($<HTMLElement>("thumbs").contains(document.activeElement) || sidebar.selection().length)) {
+    e.preventDefault();
+    deletePages();
+  }
   else if (ctrl && k === "f") { e.preventDefault(); openFind(); }
   else if (ctrl && k === "s") { e.preventDefault(); void save(); }
   else if (ctrl && k === "i") { e.preventDefault(); btnInvert.click(); }
@@ -1206,6 +1436,7 @@ window.addEventListener("keydown", (e) => {
     else if (!findbar.hidden) { e.preventDefault(); closeFind(); }
     else if (!$<HTMLElement>("outline-panel").hidden) { e.preventDefault(); outlinePanel.close(true); }
     else if (anngroup.classList.contains("open")) { e.preventDefault(); closeAnn(); }
+    else if (sidebar.selection().length) { e.preventDefault(); sidebar.clearSelection(); }
     else if (sidebar.isOpen) { e.preventDefault(); sidebar.setOpen(false); }
   }
   else if (!ctrl && !typing) {
@@ -1395,15 +1626,99 @@ window.addEventListener("resize", refreshDrag);
 
 // ---------- Dateien von aussen ----------
 
+let springOpened = false;
+
+function endSpringOpen() {
+  sidebar.showMarker(null);
+  if (springOpened) { sidebar.setOpen(false, false); springOpened = false; }
+}
+
+/** Pixelposition des Ablegens in CSS-Pixeln des Fensters. */
+const dropPoint = (position: { x: number; y: number }) => ({ x: position.x / devicePixelRatio, y: position.y / devicePixelRatio });
+
 void getCurrentWebview().onDragDropEvent((e) => {
-  if (e.payload.type === "over") document.body.classList.add("dragging");
-  else if (e.payload.type === "leave") document.body.classList.remove("dragging");
-  else if (e.payload.type === "drop") {
+  const payload = e.payload;
+  if (payload.type === "leave") {
     document.body.classList.remove("dragging");
-    const p = e.payload.paths.find((x) => x.toLowerCase().endsWith(".pdf"));
-    if (p) void openDoc(p);
+    endSpringOpen();
+    return;
   }
+  const at = dropPoint(payload.position);
+  if (payload.type === "over") {
+    document.body.classList.add("dragging");
+    if (IS_READER && pdfViewer.pdfDocument) {
+      // Dateien am linken Rand: die Leiste faehrt von selbst heraus, damit man die
+      // Einfuegestelle zwischen den Seiten sieht.
+      if (at.x < 40 && !sidebar.isOpen) { sidebar.setOpen(true, false); springOpened = true; }
+      sidebar.showMarker(sidebar.insertionAt(at.x, at.y));
+    }
+    return;
+  }
+  document.body.classList.remove("dragging");
+  const pdfs = payload.paths.filter((x) => x.toLowerCase().endsWith(".pdf"));
+  const insertAt = IS_READER && pdfViewer.pdfDocument ? sidebar.insertionAt(at.x, at.y) : null;
+  // Wurde in die Leiste fallengelassen, bleibt sie offen: man will das Ergebnis sehen.
+  if (insertAt !== null) { springOpened = false; sidebar.showMarker(null); } else endSpringOpen();
+  if (!pdfs.length) return;
+  if (insertAt !== null) void insertPaths(pdfs, insertAt);
+  else if (IS_READER) void openDoc(pdfs[0]);
+  else void dropInLibrary(pdfs);
 });
+
+/** Eine aus Seiten erzeugte Datei liegt zunaechst im Ablageordner; faellt sie ins Bibliotheksfenster,
+ *  wird sie ein richtiges Dokument im Bibliotheksordner. */
+async function adoptDropped(path: string): Promise<string> {
+  if (!/[\\/]Folio-Ablage[\\/]/i.test(path)) return path;
+  try { return await invoke<string>("adopt_temp_pdf", { path }); } catch { return path; }
+}
+
+async function dropInLibrary(paths: string[]) {
+  const files = await Promise.all(paths.map(adoptDropped));
+  if (files.length === 1) { await openDoc(files[0]); return; }
+  const choice = await askMerge(files);
+  if (choice === "single") for (const f of files) await openDoc(f);
+  else if (choice === "merge") await mergeFiles(files);
+}
+
+function askMerge(files: string[]): Promise<"merge" | "single" | null> {
+  const dlg = $<HTMLDialogElement>("merge-ask");
+  const names = files.map((f) => f.split(/[\\/]/).pop() ?? f);
+  $<HTMLElement>("merge-ask-text").textContent =
+    `${files.length} PDFs: ${names.slice(0, 4).join(", ")}${names.length > 4 ? " …" : ""}. ` +
+    "Beim Zusammenführen entsteht ein neues Dokument im Ordner Dokumente\\Folio; die Originale bleiben unverändert.";
+  $<HTMLElement>("merge-ask-error").textContent = "";
+  return new Promise((resolve) => {
+    const done = (value: "merge" | "single" | null) => {
+      dlg.close();
+      for (const [id, fn] of handlers) $<HTMLButtonElement>(id).removeEventListener("click", fn);
+      dlg.removeEventListener("cancel", onCancel);
+      resolve(value);
+    };
+    const onCancel = (ev: Event) => { ev.preventDefault(); done(null); };
+    const handlers: Array<[string, () => void]> = [
+      ["merge-ask-merge", () => done("merge")],
+      ["merge-ask-single", () => done("single")],
+      ["merge-ask-cancel", () => done(null)],
+    ];
+    for (const [id, fn] of handlers) $<HTMLButtonElement>(id).addEventListener("click", fn);
+    dlg.addEventListener("cancel", onCancel);
+    dlg.showModal();
+  });
+}
+
+async function mergeFiles(files: string[]) {
+  try {
+    const parts = await Promise.all(files.map(async (path) => new Uint8Array(await invoke<ArrayBuffer>("read_pdf_plain", { path }))));
+    const merged = await mergeBytes(parts);
+    const first = (files[0].split(/[\\/]/).pop() ?? "Dokument").replace(/\.pdf$/i, "");
+    const target = await invoke<string>("library_pdf", merged, {
+      headers: { "x-name": hex(`${first} + ${files.length - 1} weitere.pdf`) },
+    });
+    await openDoc(target);
+  } catch (error) {
+    say("Zusammenführen fehlgeschlagen: " + String(error));
+  }
+}
 
 // ---------- Start ----------
 

@@ -39,6 +39,25 @@ export class Bookmarks {
     return on;
   }
 
+  /** Nach einer Seitenoperation hat das Dokument einen neuen Fingerabdruck: die Lesezeichen
+   *  wandern mit (abgebildet oder ersetzt). Unter dem alten Schluessel bleiben sie fuer die
+   *  Datei auf der Platte erhalten, solange nicht gesichert wird. */
+  rekey(fingerprint: string | null, change: { map: (p: number) => number | null } | { set: number[] }, pageCount = Infinity) {
+    const previous = this.pages;
+    this.key = fingerprint ? PREFIX + fingerprint : null;
+    if ("set" in change) {
+      this.pages = new Set(change.set.filter((p) => p >= 1 && p <= pageCount));
+    } else {
+      this.pages = new Set();
+      for (const p of previous) {
+        const to = change.map(p);
+        if (to !== null && to >= 1 && to <= pageCount) this.pages.add(to);
+      }
+    }
+    this.persist();
+    this.onChange();
+  }
+
   /** Nach dem Umsortieren/Loeschen von Seiten: alte Seitenzahlen auf neue abbilden. */
   remap(map: (oldPage: number) => number | null) {
     const next = new Set<number>();

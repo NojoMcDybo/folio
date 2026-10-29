@@ -11,6 +11,7 @@ export type ViewMenuActions = {
   sidebar: () => void;
   toggleBookmark: () => void;
   goTo: (page: number) => void;
+  pages: (x: number, y: number) => void;
 };
 
 export class ViewMenu {
@@ -31,6 +32,11 @@ export class ViewMenu {
     button.addEventListener("click", () => this.toggle());
     menu.querySelector("#view-sheet")!.addEventListener("click", () => { this.close(); actions.sheet(); });
     menu.querySelector("#view-sidebar")!.addEventListener("click", () => { this.close(); actions.sidebar(); });
+    menu.querySelector("#view-pages")!.addEventListener("click", () => {
+      const r = menu.getBoundingClientRect();
+      this.close();
+      actions.pages(r.left, r.top + 120);
+    });
     bookmarkRow.addEventListener("click", () => actions.toggleBookmark());
     bookmarkList.addEventListener("click", (e) => {
       const chip = (e.target as Element).closest<HTMLElement>("[data-page]");

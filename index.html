@@ -74,9 +74,12 @@
         </div>
         <button type="button" id="view-sheet" class="vm-row"><span class="vm-label">Kontaktbogen</span><kbd>K</kbd></button>
         <button type="button" id="view-sidebar" class="vm-row"><span class="vm-label">Seitenleiste</span><kbd>Strg+B</kbd></button>
+        <button type="button" id="view-pages" class="vm-row"><span class="vm-label">Seiten bearbeiten …</span><kbd>›</kbd></button>
         <button type="button" id="view-bookmark" class="vm-row"><span class="vm-label">Lesezeichen setzen</span><kbd>Strg+D</kbd></button>
         <div id="view-bookmarks" hidden></div>
       </section>
+
+      <div id="page-menu" role="menu" aria-label="Seiten" hidden></div>
 
       <div id="sheet" hidden role="dialog" aria-label="Kontaktbogen">
         <header data-tauri-drag-region><h2>Alle Seiten</h2><button id="sheet-close" class="ico sm" title="Schließen · Esc"></button></header>
@@ -117,6 +120,15 @@
       <p id="library-delete-description">Die Datei und ihr Bibliothekseintrag werden entfernt. Die PDF lässt sich anschließend über den Windows-Papierkorb wiederherstellen.</p>
       <p id="library-delete-error" role="alert"></p>
       <div class="askrow"><button id="library-delete-cancel" autofocus>Abbrechen</button><button id="library-delete-confirm">In den Papierkorb</button></div>
+    </dialog>
+
+    <dialog id="crop" aria-label="Seite zuschneiden"></dialog>
+
+    <dialog id="merge-ask" aria-labelledby="merge-ask-title">
+      <h2 id="merge-ask-title">PDFs zusammenführen?</h2>
+      <p id="merge-ask-text"></p>
+      <p id="merge-ask-error" role="alert"></p>
+      <div class="askrow"><button id="merge-ask-cancel" autofocus>Abbrechen</button><button id="merge-ask-single">Einzeln öffnen</button><button id="merge-ask-merge">Zusammenführen</button></div>
     </dialog>
 
     <dialog id="ask" aria-labelledby="asktext" hidden>

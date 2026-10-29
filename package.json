@@ -1,19 +1,21 @@
 {
   "name": "folio",
   "private": true,
-  "version": "0.9.0",
+  "version": "0.10.0",
   "type": "module",
   "scripts": {
     "installer:build": "tauri build --bundles nsis",
     "dev": "vite",
     "build": "tsc && vite build",
     "test:scroll": "node --test tests/scroll-navigation.test.mjs",
+    "test": "node --test tests/*.test.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "testapp:dev": "tauri dev --config src-tauri/tauri.test.conf.json",
     "testapp:build": "tauri build --config src-tauri/tauri.test.conf.json"
   },
   "dependencies": {
+    "@crabnebula/tauri-plugin-drag": "^2.1.0",
     "@tauri-apps/api": "~2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.3",
     "@tauri-apps/plugin-opener": "^2",

@@ -18,6 +18,9 @@ PDF-Reader für Windows. Tauri v2 (Rust + WebView2), Frontend in TypeScript mit 
 - Kontaktbogen (K): alle Seiten als Raster
 - Ansicht: fortlaufend, Einzelseite, Doppelseite (Knopf neben dem Inhaltsverzeichnis)
 - Eigene Lesezeichen pro Dokument (Strg+D), unabhängig vom Dateipfad
+- Seiten bearbeiten: Miniaturen ziehen zum Umsortieren, Entf löscht, Strg+, / Strg+. dreht, Zuschneiden mit Rahmen, PDFs einfügen
+  (Dialog oder auf die Leiste ziehen), mehrere PDFs zusammenführen, Seiten als eigene PDF sichern, in die Notch-Ablage legen oder aus dem Fenster
+  in den Explorer bzw. in die Bibliothek ziehen. Alles lässt sich mit Strg+Z zurücknehmen; geschrieben wird erst beim Sichern.
 
 ## Tastatur
 
@@ -31,6 +34,10 @@ PDF-Reader für Windows. Tauri v2 (Rust + WebView2), Frontend in TypeScript mit 
 | K | Kontaktbogen |
 | Strg+D | Lesezeichen setzen/entfernen |
 | Bild↑ / Bild↓ | Seite blättern (Einzel-/Doppelseite) |
+| Strg+Z / Strg+Y | Seitenoperation zurück / wiederholen |
+| Strg+, / Strg+. | Seite(n) links / rechts drehen |
+| Entf | markierte Seiten löschen (Seitenleiste) |
+| Strg-/Umschalt-Klick | Seiten markieren |
 | Strg + Rad | Zoom |
 | Strg+0 | Ausgangsbreite |
 | F3 | nächster Treffer |
@@ -55,7 +62,7 @@ aufforderung ist nichts zu tun.
 
 ## Lizenzen der Bausteine
 
-PDF.js (Apache-2.0), Tauri (MIT/Apache-2.0). MuPDF wird bewusst nicht verwendet — AGPL.
+PDF.js (Apache-2.0), Tauri (MIT/Apache-2.0), lopdf (MIT, Drehen/Zuschneiden), tauri-plugin-drag (MIT/Apache-2.0). MuPDF wird bewusst nicht verwendet — AGPL.
 
 ## Lizenz
 
