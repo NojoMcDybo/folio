@@ -129,3 +129,21 @@ pub fn adopt_temp_pdf(path: String) -> Result<String, String> {
     let _ = std::fs::remove_file(&source);
     Ok(target.to_string_lossy().into_owned())
 }
+
+/// Erkannten Text unsichtbar in die PDF schreiben. Rohkoerper: 4 Byte Laenge (little endian) des
+/// JSON mit den Seiten (`folio_pdfops::text::PageText`), danach die PDF-Bytes. Die Woerter sind zu
+/// viele fuer eine Kopfzeile.
+#[tauri::command]
+pub async fn pdf_embed_text(request: Request<'_>) -> Result<Response, String> {
+    let data = body(&request)?;
+    let out = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<u8>, String> {
+        let head: [u8; 4] = data.get(..4).and_then(|b| b.try_into().ok()).ok_or("Eingabe zu kurz")?;
+        let json_len = u32::from_le_bytes(head) as usize;
+        let json = data.get(4..4 + json_len).ok_or("Eingabe unvollstaendig")?;
+        let pages: Vec<folio_pdfops::text::PageText> = serde_json::from_slice(json).map_err(|e| e.to_string())?;
+        folio_pdfops::text::embed_text(&data[4 + json_len..], &pages).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    Ok(Response::new(out))
+}

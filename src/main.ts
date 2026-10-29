@@ -24,11 +24,14 @@ import { PageMenu, type MenuItem } from "./page-menu";
 import { CropDialog, cropEdits } from "./crop";
 import { describePages } from "./page-ops";
 import { mergeBytes } from "./merge";
+import { OcrLayer, embedPayload, frameEmbed } from "./ocr";
+import { detectEntities, entityAt, type Entity } from "./detect";
+import { cleanSelection, textMenuItems } from "./text-actions";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { WebviewWindow, getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
@@ -352,12 +355,16 @@ const viewMenu = new ViewMenu(
     toggleBookmark,
     goTo: goToPage,
     pages: (x, y) => openPageMenu(x, y),
+    toggleOcr: () => ocr.setEnabled(!ocr.isEnabled),
+    ocrNow: () => { viewMenu.close(); void ocr.recognizeNow(pdfViewer.currentPageNumber); say("Text wird erkannt …"); },
+    embedOcr: () => void embedRecognizedText(),
   },
 );
 viewMenu.setMode(viewMode);
 
 function refreshViewMenu() {
   viewMenu.setBookmarks(bookmarks.list(), bookmarks.has(pdfViewer.currentPageNumber));
+  viewMenu.setOcr(ocr.isEnabled, ocr.recognized().size);
 }
 
 function toggleBookmark() {
@@ -416,7 +423,7 @@ container.addEventListener("dblclick", (e) => {
   const page = target?.closest<HTMLElement>(".page");
   if (!page || !pdfViewer.pdfDocument || tool !== "none" || e.button !== 0 ||
       e.ctrlKey || e.metaKey || e.altKey || e.shiftKey ||
-      target?.closest(".textLayer span, .annotationLayer, .annotationEditorLayer, a, input, textarea, [contenteditable=true]")) return;
+      target?.closest(".textLayer span, .ocr-word, .annotationLayer, .annotationEditorLayer, a, input, textarea, [contenteditable=true]")) return;
   e.preventDefault();
   const pageNumber = Number(page.dataset.pageNumber);
   if (pageNumber > 0) pdfViewer.currentPageNumber = pageNumber;
@@ -444,6 +451,106 @@ function markDirty(state: boolean) {
   btnSave.hidden = !state;
 }
 
+
+// ---------- Texterkennung ----------
+
+const ocrChip = $<HTMLElement>("ocr-chip");
+let ocrChipTimer = 0;
+
+const ocr = new OcrLayer({
+  pageDiv: (page) => pdfViewer.getPageView(page - 1)?.div ?? null,
+  say,
+  busy: (waiting, page) => {
+    window.clearTimeout(ocrChipTimer);
+    if (waiting > 0) {
+      ocrChip.textContent = page ? `Text wird erkannt … Seite ${page}${waiting > 1 ? ` (+${waiting - 1})` : ""}` : "Text wird erkannt …";
+      ocrChip.hidden = false;
+      glass?.invalidate();
+    } else if (!ocrChip.hidden) {
+      const n = ocr.recognized().size;
+      ocrChip.textContent = n ? "Text erkannt – markieren, kopieren, Links öffnen" : "Kein Text gefunden";
+      ocrChipTimer = window.setTimeout(() => { ocrChip.hidden = true; }, 2600);
+    }
+  },
+  changed: () => refreshViewMenu(),
+});
+
+eventBus.on("pagerendered", (e: { pageNumber: number }) => {
+  const div = pdfViewer.getPageView(e.pageNumber - 1)?.div;
+  if (div) ocr.onPageRendered(e.pageNumber, div);
+});
+
+/** Erkannten Text unsichtbar in die PDF schreiben - als Schritt, den man zuruecknehmen kann. */
+async function embedRecognizedText() {
+  const recognized = ocr.recognized();
+  const doc = pdfViewer.pdfDocument;
+  if (!doc || !recognized.size) return;
+  const pages = await embedPayload(doc, recognized);
+  const ok = await editor.transform("Erkannten Text einbetten", async (_doc, before) =>
+    new Uint8Array(await invoke<ArrayBuffer>("pdf_embed_text", frameEmbed(pages, before))));
+  if (ok) say(`Text auf ${recognized.size === 1 ? "1 Seite" : `${recognized.size} Seiten`} eingebettet – beim Sichern wird er Teil der PDF`);
+}
+
+// ---------- Text: Rechtsklick und Links ----------
+
+const textMenu = new PageMenu($<HTMLElement>("text-menu"));
+const copyText = (text: string) => void navigator.clipboard.writeText(text).catch(() => say("Kopieren nicht möglich"));
+const openExternal = (url: string) => void openUrl(url).catch((error) => say("Konnte nicht geöffnet werden: " + String(error)));
+
+/** Zeichenstelle unter dem Mauszeiger innerhalb eines Textknotens. */
+function caretOffset(x: number, y: number): { node: Node; offset: number } | null {
+  const d = document as Document & { caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null };
+  const pos = d.caretPositionFromPoint?.(x, y);
+  if (pos) return { node: pos.offsetNode, offset: pos.offset };
+  const range = document.caretRangeFromPoint?.(x, y);
+  return range ? { node: range.startContainer, offset: range.startOffset } : null;
+}
+
+container.addEventListener("contextmenu", (e) => {
+  if (tool !== "none" || !pdfViewer.pdfDocument) return;
+  const target = e.target instanceof Element ? e.target : null;
+  const word = target?.closest<HTMLElement>(".textLayer span, .ocr-word");
+  const selected = cleanSelection(window.getSelection()?.toString() ?? "");
+  if (!word && !selected) return;
+  e.preventDefault();
+  let text = selected;
+  let entity: Entity | null = null;
+  if (selected) {
+    entity = detectEntities(selected).find((x) => x.start === 0 && x.end >= selected.length - 1) ?? null;
+  } else if (word) {
+    if (word.classList.contains("ocr-link")) {
+      // Erkannte Adresse: alle Woerter derselben Adresse gehoeren zusammen.
+      const href = word.dataset.href!;
+      const parts = [...word.parentElement!.querySelectorAll<HTMLElement>(".ocr-link")].filter((w) => w.dataset.href === href);
+      text = parts.map((w) => w.textContent).join(" ");
+      entity = detectEntities(text).find((x) => x.href === href) ?? { type: word.dataset.kind as Entity["type"], text, start: 0, end: text.length, href };
+    } else {
+      text = cleanSelection(word.textContent ?? "");
+      const at = caretOffset(e.clientX, e.clientY);
+      const inSpan = at && word.contains(at.node) ? at.offset : -1;
+      entity = inSpan >= 0 ? entityAt(word.textContent ?? "", inSpan) : null;
+      // Bei einer Adresse zaehlt nur sie, sonst das Wort unter dem Zeiger.
+      if (entity) text = entity.text;
+      else if (at && at.node.nodeType === Node.TEXT_NODE) {
+        const full = at.node.textContent ?? "";
+        const left = full.slice(0, at.offset).search(/[\p{L}\p{N}-]*$/u);
+        const right = full.slice(at.offset).search(/[^\p{L}\p{N}-]/u);
+        text = full.slice(left < 0 ? 0 : left, right < 0 ? full.length : at.offset + right) || text;
+      }
+    }
+  }
+  const items = textMenuItems(text, entity, { open: openExternal, copy: copyText });
+  if (items.length) textMenu.open(items, e.clientX, e.clientY);
+});
+
+// Ein Klick auf erkannte Adresse in einer Textebene der Erkennung oeffnet sie - ausser man
+// markiert gerade Text.
+container.addEventListener("click", (e) => {
+  const link = e.target instanceof Element ? e.target.closest<HTMLElement>(".ocr-link") : null;
+  if (!link || tool !== "none" || !(window.getSelection()?.isCollapsed ?? true)) return;
+  e.preventDefault();
+  openExternal(link.dataset.href!);
+});
 
 // ---------- Seiten bearbeiten ----------
 
@@ -707,6 +814,7 @@ function attachDocument(doc: pdfjsLib.PDFDocumentProxy) {
   outlinePanel.setDocument(doc);
   sidebar.setDocument(doc);
   sheet.close(false);
+  ocr.setDocument(doc);
   annotationEdited = false;
 
   const storage = doc.annotationStorage as unknown as {
@@ -880,6 +988,7 @@ function paintTool(key: string) {
 
 function setTool(next: string) {
   tool = next;
+  document.body.dataset.tool = next;
   if (next !== "none") armed = next;
   paintTool(next);
   if (!pdfViewer.pdfDocument) return;

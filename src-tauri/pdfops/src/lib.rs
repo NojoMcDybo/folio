@@ -11,6 +11,7 @@ use std::fmt;
 
 pub mod files;
 pub mod pages;
+pub mod text;
 
 pub use pages::{apply, Edit};
 

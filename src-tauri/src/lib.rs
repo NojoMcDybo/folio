@@ -1,5 +1,6 @@
 mod file_safety;
 mod notch;
+mod ocr;
 mod pdf_tools;
 
 use file_safety::{decode_hex_path, FileState};
@@ -110,6 +111,8 @@ pub fn run() {
             recycle_pdf,
             startup_file,
             pdf_tools::pdf_edit,
+            pdf_tools::pdf_embed_text,
+            ocr::ocr_page,
             pdf_tools::read_pdf_plain,
             pdf_tools::write_pdf_copy,
             pdf_tools::temp_file,

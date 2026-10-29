@@ -12,6 +12,9 @@ export type ViewMenuActions = {
   toggleBookmark: () => void;
   goTo: (page: number) => void;
   pages: (x: number, y: number) => void;
+  toggleOcr: () => void;
+  ocrNow: () => void;
+  embedOcr: () => void;
 };
 
 export class ViewMenu {
@@ -37,6 +40,9 @@ export class ViewMenu {
       this.close();
       actions.pages(r.left, r.top + 120);
     });
+    menu.querySelector("#view-ocr")!.addEventListener("click", () => actions.toggleOcr());
+    menu.querySelector("#view-ocr-now")!.addEventListener("click", () => { this.close(); actions.ocrNow(); });
+    menu.querySelector("#view-ocr-embed")!.addEventListener("click", () => { this.close(); actions.embedOcr(); });
     bookmarkRow.addEventListener("click", () => actions.toggleBookmark());
     bookmarkList.addEventListener("click", (e) => {
       const chip = (e.target as Element).closest<HTMLElement>("[data-page]");
@@ -56,6 +62,16 @@ export class ViewMenu {
 
   setMode(mode: ViewMode) {
     for (const [m, el] of this.modeButtons) el.setAttribute("aria-checked", String(m === mode));
+  }
+
+  /** Texterkennung: Automatik an/aus und wie viele Seiten erkannten Text haben (Einbetten erst dann). */
+  setOcr(enabled: boolean, recognized: number) {
+    const auto = this.menu.querySelector<HTMLElement>("#view-ocr")!;
+    auto.setAttribute("aria-checked", String(enabled));
+    auto.querySelector("kbd")!.textContent = enabled ? "an" : "aus";
+    const embed = this.menu.querySelector<HTMLElement>("#view-ocr-embed")!;
+    embed.hidden = recognized === 0;
+    embed.querySelector("kbd")!.textContent = recognized === 1 ? "1 Seite" : `${recognized} Seiten`;
   }
 
   setBookmarks(pages: number[], currentHas: boolean) {

@@ -21,6 +21,10 @@ PDF-Reader für Windows. Tauri v2 (Rust + WebView2), Frontend in TypeScript mit 
 - Seiten bearbeiten: Miniaturen ziehen zum Umsortieren, Entf löscht, Strg+, / Strg+. dreht, Zuschneiden mit Rahmen, PDFs einfügen
   (Dialog oder auf die Leiste ziehen), mehrere PDFs zusammenführen, Seiten als eigene PDF sichern, in die Notch-Ablage legen oder aus dem Fenster
   in den Explorer bzw. in die Bibliothek ziehen. Alles lässt sich mit Strg+Z zurücknehmen; geschrieben wird erst beim Sichern.
+- Texterkennung (Windows.Media.Ocr, offline) für Seiten ohne eigenen Text: erkannte Wörter lassen sich markieren und kopieren,
+  Adressen, E-Mails und Telefonnummern werden zu Links; Rechtsklick auf Text: kopieren, nachschlagen, übersetzen, im Web suchen.
+  Optional wird der erkannte Text unsichtbar ins PDF geschrieben (durchsuchbar in jedem Programm). Braucht das Windows-Sprachpaket.
+- Inhaltsverzeichnis: ohne Lesezeichen in der Datei liest Folio ein gedrucktes Verzeichnis oder erkennt Überschriften an ihrer Größe.
 
 ## Tastatur
 

@@ -79,6 +79,11 @@ export class PageEditor {
       this.host.edit(before, edits.map((e) => ({ op: "crop", pages: e.pages.map((p) => p - 1), rect: e.rect }))));
   }
 
+  /** Beliebige Umwandlung der Bytes als rueckgaengig machbarer Schritt (z. B. Text einbetten). */
+  async transform(label: string, produce: (doc: PDFDocumentProxy, before: Uint8Array) => Promise<Uint8Array | null | undefined>) {
+    return this.commit(label, this.host.currentPage(), ops.identityMap, produce);
+  }
+
   async deletePages(pages: number[]) {
     const doc = this.host.doc();
     if (!doc) return false;

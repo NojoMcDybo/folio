@@ -958,7 +958,7 @@ body.bare #thumbs, body.bare #thumbs-grip, body.bare #thumbs-edge { opacity: 0; 
 
 /* ---------- Seitenmenue und Zuschneiden ---------- */
 
-#page-menu {
+#page-menu, #text-menu {
   position: fixed;
   z-index: 66;
   min-width: 250px;
@@ -988,8 +988,8 @@ body.bare #thumbs, body.bare #thumbs-grip, body.bare #thumbs-edge { opacity: 0; 
 .pm-item kbd { color: var(--dim); font: inherit; font-size: 11px; white-space: nowrap; }
 .pm-item.danger:hover kbd { color: #ffe3e1; }
 .pm-sep { height: 1px; margin: 5px 8px; background: #ffffff1f; }
-@media (prefers-reduced-transparency: reduce) { #page-menu { background: #262629; backdrop-filter: none; } }
-@media (forced-colors: active) { #page-menu { background: Canvas; color: CanvasText; } }
+@media (prefers-reduced-transparency: reduce) { #page-menu, #text-menu { background: #262629; backdrop-filter: none; } }
+@media (forced-colors: active) { #page-menu, #text-menu { background: Canvas; color: CanvasText; } }
 
 #crop {
   padding: 0;
@@ -1041,3 +1041,35 @@ body.bare #thumbs, body.bare #thumbs-grip, body.bare #thumbs-edge { opacity: 0; 
 /* Waehrend eine Seitenoperation das PDF neu aufbaut. */
 body.working { cursor: progress; }
 body.working #reader { opacity: 0.72; transition: opacity 0.2s var(--ease) 0.25s; }
+
+/* ---------- Texterkennung ---------- */
+
+.ocrLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  container-type: size;
+  color: transparent;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+  line-height: 1;
+}
+.ocr-word { position: absolute; white-space: pre; transform-origin: 0 0; }
+.ocrLayer ::selection { background: #0a84ff59; color: transparent; }
+.ocr-link { cursor: pointer; }
+.ocr-link:hover { background: #0a84ff2e; border-radius: 2px; box-shadow: 0 1px 0 #0a84ff; }
+/* Mit Stift, Marker oder Textfeld darf die Erkennung nicht im Weg liegen. */
+body[data-tool]:not([data-tool="none"]) .ocrLayer { pointer-events: none; }
+
+#ocr-chip {
+  top: 18px;
+  left: 50%;
+  translate: -50% 0;
+  padding: 8px 16px;
+  border-radius: 16px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 45;
+}

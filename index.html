@@ -75,11 +75,16 @@
         <button type="button" id="view-sheet" class="vm-row"><span class="vm-label">Kontaktbogen</span><kbd>K</kbd></button>
         <button type="button" id="view-sidebar" class="vm-row"><span class="vm-label">Seitenleiste</span><kbd>Strg+B</kbd></button>
         <button type="button" id="view-pages" class="vm-row"><span class="vm-label">Seiten bearbeiten …</span><kbd>›</kbd></button>
+        <button type="button" id="view-ocr" class="vm-row" role="menuitemcheckbox" aria-checked="true"><span class="vm-label">Text in Bildern automatisch erkennen</span><kbd></kbd></button>
+        <button type="button" id="view-ocr-now" class="vm-row"><span class="vm-label">Text auf dieser Seite erkennen</span><kbd></kbd></button>
+        <button type="button" id="view-ocr-embed" class="vm-row" hidden><span class="vm-label">Erkannten Text ins PDF einbetten</span><kbd></kbd></button>
         <button type="button" id="view-bookmark" class="vm-row"><span class="vm-label">Lesezeichen setzen</span><kbd>Strg+D</kbd></button>
         <div id="view-bookmarks" hidden></div>
       </section>
 
       <div id="page-menu" role="menu" aria-label="Seiten" hidden></div>
+      <div id="text-menu" role="menu" aria-label="Text" hidden></div>
+      <div id="ocr-chip" class="glass" role="status" hidden></div>
 
       <div id="sheet" hidden role="dialog" aria-label="Kontaktbogen">
         <header data-tauri-drag-region><h2>Alle Seiten</h2><button id="sheet-close" class="ico sm" title="Schließen · Esc"></button></header>
