@@ -124,7 +124,9 @@ export class OcrLayer {
         if (chars >= MIN_TEXT) { page.cleanup(); if (generation === this.generation) this.states.set(n, "none"); return; }
       }
       const base = page.getViewport({ scale: 1 });
-      const scale = Math.min(8, Math.max(1, LONG_SIDE / Math.max(base.width, base.height)));
+      const long = Math.max(base.width, base.height);
+      // Nie groesser als das, was Windows.Media.Ocr annimmt (MaxImageDimension, meist 10000).
+      const scale = Math.min(8, Math.max(1, LONG_SIDE / long), 9000 / long);
       const viewport = page.getViewport({ scale });
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(viewport.width);

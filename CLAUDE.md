@@ -1,6 +1,7 @@
 # Project memory
 
 ## Active project
+- 2026-10-29: Versions 0.9.0–0.13.0 (sidebar, page editing, OCR, phone signing, compress/gray/flatten + CLI) live on branch `claude/pdf-werkzeuge-plan`, not merged, no tag (a `v*` tag would trigger the release workflow and auto-update installed apps). Overview and open points: `PLAN-PDF-WERKZEUGE.md`. Rust PDF logic is the workspace crate `src-tauri/pdfops` (`cargo test -p folio-pdfops`); UI tests in `tests/browser`.
 - 2026-09-25: Compatibility update 0.8.1 in the same isolated checkout: WebGL 1 support, bounded GPU allocations, Canvas2D optical fallback on initialization/render/context failures. Original production source remains unchanged. Windows reduced-transparency/forced-colors preferences remain respected. User reported grey surfaces on other PCs; exact target hardware failure is unconfirmed, use simulated rendering-failure tests and request target-PC confirmation.
 - 2026-09-24: Current isolated checkout is `D:/Dev/folio-installer`, branch `codex/library-installer`, based on `1dff679`. `D:/Dev/folio` already contains the earlier 0.7.0 changes. Preserve it; its uncommitted icon assets and NSIS PDF registration were copied into this checkout. Scope: centered library dots, Explorer reveal, complete offline Windows installer 0.8.0. User requested building the production installer, not replacing the installed app. See `INSTALLATION.md`.
 - **Folio**: Windows PDF reader in this repository; Tauri 2/Rust, TypeScript, PDF.js, custom WebGL glass.
