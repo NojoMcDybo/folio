@@ -11,6 +11,11 @@ import "./styles.css"; // muss nach pdf_viewer.css kommen
 import { createGlassRenderer } from "./glass-renderer";
 import { clampPosition, pageAtPosition, speedAtPosition } from "./scroll-navigation";
 import { OutlinePanel } from "./outline";
+import { PageSidebar } from "./sidebar";
+import { Bookmarks } from "./bookmarks";
+import { ContactSheet } from "./sheet";
+import { ViewMenu } from "./view-menu";
+import { VIEW_MODES, isPaged, loadViewMode, saveViewMode, type ViewMode } from "./view-modes";
 import { ColorPalette } from "./color-palette";
 import { LibraryActions } from "./library-actions";
 import { notchClosed, notchOnSearch, notchReading, notchSearchState } from "./notch";
@@ -36,6 +41,9 @@ const EditorParams = pdfjsLib.AnnotationEditorParamsType;
 /** Anteil der Fensterbreite, den die Seite beim Oeffnen einnimmt.
  *  Eine Zahl - hier drehen, wenn es zu schmal oder zu breit wirkt. */
 const OPEN_WIDTH = 0.3;
+
+/** Seitenweise Ansichten: etwas kleiner als "ganze Seite", damit ein Rand bleibt und nichts scrollt. */
+const PAGED_FIT = 0.94;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -65,6 +73,8 @@ const ICON: Record<string, string> = {
   "b-home": P('<path d="M14.5 5 8 12l6.5 7"/>'),
   "b-outline": P('<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 4v16M12 8h5M12 12h5M12 16h3"/>'),
   "outline-close": P('<path d="M7 7l10 10M17 7 7 17"/>'),
+  "b-view": P('<rect x="4" y="5" width="7" height="14" rx="1.6"/><rect x="13" y="5" width="7" height="14" rx="1.6"/>'),
+  "sheet-close": P('<path d="M7 7l10 10M17 7 7 17"/>'),
   "b-find": P('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>'),
   "b-invert": P('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" stroke="none"/>'),
   "b-save": P('<path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 19h14"/>'),
@@ -302,12 +312,75 @@ const outlinePanel = new OutlinePanel(
   () => suspendScrolling(),
 );
 let zoomBeforeFit: number | null = null;
+let viewMode: ViewMode = loadViewMode();
+
+const bookmarks = new Bookmarks(() => { sidebar?.refreshBookmarks(); refreshViewMenu(); });
+const goToPage = (page: number) => { suspendScrolling(); pdfViewer.currentPageNumber = page; };
+const sidebar = new PageSidebar({
+  root: $<HTMLElement>("thumbs"),
+  list: $<HTMLElement>("thumb-list"),
+  grip: $<HTMLElement>("thumbs-grip"),
+  edge: $<HTMLElement>("thumbs-edge"),
+  wheelHost: container,
+  go: goToPage,
+  isBookmarked: (page) => bookmarks.has(page),
+});
+const sheet = new ContactSheet(
+  $<HTMLElement>("sheet"), $<HTMLElement>("sheet-grid"), $<HTMLElement>("sheet-close"),
+  goToPage, (page) => bookmarks.has(page),
+);
+const viewMenu = new ViewMenu(
+  $<HTMLButtonElement>("b-view"), $<HTMLElement>("view-menu"),
+  $<HTMLButtonElement>("view-bookmark"), $<HTMLElement>("view-bookmarks"),
+  {
+    setMode: (mode) => applyViewMode(mode, true),
+    sheet: () => sheet.toggle(pdfViewer.pdfDocument, pdfViewer.currentPageNumber),
+    sidebar: () => sidebar.toggle(),
+    toggleBookmark,
+    goTo: goToPage,
+  },
+);
+viewMenu.setMode(viewMode);
+
+function refreshViewMenu() {
+  viewMenu.setBookmarks(bookmarks.list(), bookmarks.has(pdfViewer.currentPageNumber));
+}
+
+function toggleBookmark() {
+  if (!pdfViewer.pdfDocument) return;
+  const page = pdfViewer.currentPageNumber;
+  say(bookmarks.toggle(page) ? `Lesezeichen auf Seite ${page}` : `Lesezeichen von Seite ${page} entfernt`);
+}
 
 function fitOpen() {
   if (!pdfViewer.pdfDocument) return;
   zoomBeforeFit = null;
+  // Seitenweise Ansichten fuellen das Fenster, sonst gaebe es nur eine kleine Seite im Leeren.
+  if (isPaged(viewMode)) {
+    pdfViewer.currentScaleValue = "page-fit";
+    pdfViewer.currentScale *= PAGED_FIT;
+    return;
+  }
   pdfViewer.currentScaleValue = "page-width";
   pdfViewer.currentScale *= OPEN_WIDTH;
+}
+
+/** Seitenanordnung wechseln, ohne die Leseposition zu verlieren. */
+function applyViewMode(mode: ViewMode, refit: boolean) {
+  const page = pdfViewer.currentPageNumber;
+  viewMode = mode;
+  saveViewMode(mode);
+  document.body.classList.toggle("paged", isPaged(mode));
+  viewMenu.setMode(mode);
+  if (!pdfViewer.pdfDocument) return;
+  const { scroll, spread } = VIEW_MODES[mode];
+  pdfViewer.scrollMode = scroll;
+  pdfViewer.spreadMode = spread;
+  if (refit) fitOpen();
+  pdfViewer.currentPageNumber = page;
+  suspendScrolling();
+  paintProgress();
+  glass?.invalidate();
 }
 
 let chipTimer = 0;
@@ -358,6 +431,7 @@ function markDirty(state: boolean) {
 }
 
 eventBus.on("pagesinit", () => {
+  applyViewMode(viewMode, false);
   fitOpen();
   if (pendingPage > 1 && pendingPage <= pdfViewer.pagesCount) {
     pdfViewer.currentPageNumber = pendingPage;
@@ -372,6 +446,9 @@ eventBus.on("pagesinit", () => {
 
 eventBus.on("pagechanging", (e: { pageNumber: number }) => {
   outlinePanel.setCurrentPage(e.pageNumber);
+  sidebar.setCurrent(e.pageNumber);
+  refreshViewMenu();
+  paintProgress();
   flashChip(e.pageNumber + " / " + pdfViewer.pagesCount);
   if (currentPath) {
     touchRecent({ path: currentPath, page: e.pageNumber, pages: pdfViewer.pagesCount });
@@ -428,6 +505,9 @@ async function openPath(path: string) {
     pdfViewer.setDocument(doc);
     linkService.setDocument(doc, null);
     outlinePanel.setDocument(doc);
+    sidebar.setDocument(doc);
+    sheet.close(false);
+    bookmarks.setDocument(doc.fingerprints[0] ?? null, doc.numPages);
 
     const storage = doc.annotationStorage as unknown as {
       onSetModified: (() => void) | null;
@@ -697,6 +777,9 @@ $<HTMLButtonElement>("b-home").addEventListener("click", () => void requestClose
 
 btnInvert.addEventListener("click", () => {
   container.classList.toggle("invert");
+  const inverted = container.classList.contains("invert");
+  $<HTMLElement>("thumbs").classList.toggle("invert", inverted);
+  $<HTMLElement>("sheet").classList.toggle("invert", inverted);
   btnInvert.classList.toggle("on");
   btnInvert.classList.remove("pulse");
   void btnInvert.offsetWidth; // Neustart der Animation erzwingen
@@ -907,7 +990,10 @@ const scroller = $<HTMLElement>("scroller");
  *  direkt vom Scrollfortschritt ab. */
 function paintProgress() {
   const max = container.scrollHeight - container.clientHeight;
-  const p = max > 4 ? container.scrollTop / max : 0;
+  // Seitenweise zeigt der Stab die Seite, nicht die Scrollstrecke innerhalb einer Seite.
+  const paged = isPaged(viewMode) && pdfViewer.pagesCount > 1;
+  const p = paged ? (pdfViewer.currentPageNumber - 1) / (pdfViewer.pagesCount - 1)
+    : max > 4 ? container.scrollTop / max : 0;
   scroller.dataset.fill = String(Math.min(1, Math.max(0.004, p)));
   scroller.style.setProperty("--scroller-p", String(Math.min(1, Math.max(0, p))));
 }
@@ -996,7 +1082,7 @@ scroller.addEventListener("pointermove", (e) => {
   lastPointer = { x: e.clientX, y: e.clientY };
   if (!scroller.classList.contains("wide") || dragging) return;
   showTarget(e.clientX, e.clientY);
-  const nextSpeed = speedAtPosition(widePosition(e.clientY));
+  const nextSpeed = isPaged(viewMode) ? 0 : speedAtPosition(widePosition(e.clientY));
   if (!nextSpeed) { stopAuto(); return; }
   // Direction changes must not briefly continue in the old direction.
   if (Math.sign(nextSpeed) !== Math.sign(currentSpeed)) currentSpeed = 0;
@@ -1010,6 +1096,17 @@ const TRACK_MARGIN = 84;
 /** Ziehen setzt die Leseposition direkt, wie bei einer echten
  *  Bildlaufleiste: die Stelle im Fenster ist die Stelle im Dokument. */
 function scrubTo(e: PointerEvent) {
+  if (isPaged(viewMode)) {
+    const position = press?.wide
+      ? widePosition(e.clientY)
+      : clampPosition((e.clientY - TRACK_MARGIN) / Math.max(1, window.innerHeight - TRACK_MARGIN * 2));
+    const target = press?.wide
+      ? pageAtPosition(position, pdfViewer.pagesCount)
+      : Math.round(position * (pdfViewer.pagesCount - 1)) + 1;
+    if (target !== pdfViewer.currentPageNumber) pdfViewer.currentPageNumber = target;
+    if (press?.wide) showTarget(e.clientX, e.clientY);
+    return;
+  }
   if (press?.wide) {
     const position = widePosition(e.clientY);
     const pageNumber = pageAtPosition(position, pdfViewer.pagesCount);
@@ -1084,30 +1181,80 @@ window.addEventListener("keydown", (e) => {
   const ctrl = e.ctrlKey || e.metaKey;
   const k = e.key.toLowerCase();
 
-  if (e.key === "F11") { e.preventDefault(); suspendScrolling(); outlinePanel.close(); colorPalette.close(); document.body.classList.toggle("bare"); return; }
+  if (e.key === "F11") { e.preventDefault(); suspendScrolling(); outlinePanel.close(); colorPalette.close(); viewMenu.close(); document.body.classList.toggle("bare"); return; }
   if (reader.hidden) {
     if (ctrl && k === "o") { e.preventDefault(); void pick(); }
     return;
   }
 
+  // Der Kontaktbogen deckt alles ab: nur Esc/K (und seine eigenen Pfeiltasten) gelten.
+  if (sheet.isOpen) {
+    if (e.key === "Escape" || (!ctrl && !typing && k === "k")) { e.preventDefault(); sheet.close(); }
+    return;
+  }
+
   if (ctrl && k === "o") { e.preventDefault(); void pick(); }
+  else if (ctrl && k === "b") { e.preventDefault(); sidebar.toggle(); }
+  else if (ctrl && k === "d") { e.preventDefault(); toggleBookmark(); }
   else if (ctrl && k === "f") { e.preventDefault(); openFind(); }
   else if (ctrl && k === "s") { e.preventDefault(); void save(); }
   else if (ctrl && k === "i") { e.preventDefault(); btnInvert.click(); }
   else if (ctrl && e.key === "0") { e.preventDefault(); fitOpen(); }
   else if (e.key === "F3") { e.preventDefault(); dispatchFind(true, e.shiftKey); }
   else if (e.key === "Escape") {
-    if (!findbar.hidden) { e.preventDefault(); closeFind(); }
+    if (viewMenu.isOpen) { e.preventDefault(); viewMenu.close(true); }
+    else if (!findbar.hidden) { e.preventDefault(); closeFind(); }
     else if (!$<HTMLElement>("outline-panel").hidden) { e.preventDefault(); outlinePanel.close(true); }
     else if (anngroup.classList.contains("open")) { e.preventDefault(); closeAnn(); }
+    else if (sidebar.isOpen) { e.preventDefault(); sidebar.setOpen(false); }
   }
   else if (!ctrl && !typing) {
     if (k === "m") { openAnn(); setTool("mark"); }
     else if (k === "z") { openAnn(); setTool("ink"); }
     else if (k === "t") { openAnn(); setTool("text"); }
     else if (k === "v") setTool("none");
+    else if (k === "k") sheet.toggle(pdfViewer.pdfDocument, pdfViewer.currentPageNumber);
+    else if (isPaged(viewMode) && pdfViewer.pdfDocument) turnPageByKey(e);
   }
 });
+
+/** In den seitenweisen Ansichten blaettern die Tasten, solange die Seite nicht seitlich
+ *  scrollbar ist (vergroessert): dann gehoeren Links/Rechts dem Scrollen. */
+function turnPageByKey(e: KeyboardEvent) {
+  const wide = container.scrollWidth > container.clientWidth + 1;
+  const next = e.key === "PageDown" || (!wide && e.key === "ArrowRight");
+  const prev = e.key === "PageUp" || (!wide && e.key === "ArrowLeft");
+  if (next) { e.preventDefault(); pdfViewer.nextPage(); }
+  else if (prev) { e.preventDefault(); pdfViewer.previousPage(); }
+  else if (e.key === "Home") { e.preventDefault(); pdfViewer.currentPageNumber = 1; }
+  else if (e.key === "End") { e.preventDefault(); pdfViewer.currentPageNumber = pdfViewer.pagesCount; }
+}
+
+// Mausrad/Touchpad blaettert in den seitenweisen Ansichten, sobald die Seite am Ende
+// (oder Anfang) angekommen ist - wie in Vorschau. Gesperrt nach jedem Umblaettern, damit
+// Trägheit des Touchpads nicht gleich mehrere Seiten weiterschiebt.
+let pageWheel = 0;
+let pageWheelLock = 0;
+let pageWheelReset = 0;
+container.addEventListener("wheel", (e) => {
+  if (!isPaged(viewMode) || e.ctrlKey || !pdfViewer.pdfDocument) return;
+  if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+  const atTop = container.scrollTop <= 6;
+  const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 6;
+  if ((e.deltaY > 0 && !atBottom) || (e.deltaY < 0 && !atTop)) { pageWheel = 0; return; }
+  const now = performance.now();
+  if (now < pageWheelLock) return;
+  pageWheel += e.deltaY;
+  window.clearTimeout(pageWheelReset);
+  pageWheelReset = window.setTimeout(() => { pageWheel = 0; }, 250);
+  if (Math.abs(pageWheel) < 80) return;
+  const forward = pageWheel > 0;
+  pageWheel = 0;
+  pageWheelLock = now + 500;
+  if (forward ? pdfViewer.nextPage() : pdfViewer.previousPage()) {
+    requestAnimationFrame(() => { container.scrollTop = forward ? 0 : container.scrollHeight; });
+  }
+}, { passive: true });
 
 window.addEventListener("beforeunload", (e) => { if (dirty) e.preventDefault(); });
 
@@ -1227,6 +1374,7 @@ function makeDraggable(el: HTMLElement, key: string, options: { handle?: string;
 makeDraggable($<HTMLElement>("b-find"), "find");
 makeDraggable($<HTMLElement>("b-invert"), "invert");
 makeDraggable($<HTMLElement>("b-outline"), "outline");
+makeDraggable($<HTMLElement>("b-view"), "view");
 makeDraggable($<HTMLElement>("outline-panel"), "outlinePanel", {
   handle: ".outline-header",
   home: () => {

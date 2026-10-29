@@ -1,6 +1,6 @@
 [package]
 name = "folio"
-version = "0.8.4"
+version = "0.9.0"
 description = "PDF-Reader mit Markierung, Farbinvertierung und Glasoberflaeche"
 authors = ["Nojo"]
 edition = "2021"

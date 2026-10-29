@@ -114,7 +114,7 @@ body.no-gl #glasslayer { display: none; }
 
 /* .ico setzt position:relative und wuerde das fixed der Glasklasse
    ueberschreiben - hier ausdruecklich zurueckholen. */
-#b-home, #b-outline, #b-find, #b-invert, #b-save,
+#b-home, #b-outline, #b-view, #b-find, #b-invert, #b-save,
 #wincontrols, #pagechip, #anngroup, #findbar, #toast, #scroller { position: fixed; }
 
 /* Kinder einer Gruppe bleiben im Fluss, sonst bricht die Reihe. */
@@ -128,6 +128,7 @@ body.no-gl #glasslayer { display: none; }
 /* Einzelne Knoepfe an den Stellen, an denen man sie erwartet. */
 #b-home { top: 12px; left: 14px; }
 #b-outline { top: 12px; left: 64px; }
+#b-view { top: 12px; left: 114px; }
 #b-find { top: 12px; right: 178px; }
 #b-invert { top: 12px; right: 128px; }
 #wincontrols { top: 12px; right: 14px; border-radius: 17px; }
@@ -583,6 +584,8 @@ body.dragging .drop .cover svg { stroke: var(--accent); transform: scale(1.25); 
 
 /* Grosse Luecke oben beim Oeffnen - scrollt einfach weg. */
 #viewer { --page-margin: 12px; padding: 26vh 0 14px; }
+/* Seitenweise fuellt die Seite das Fenster; die grosse Luecke oben gehoert zum Lesen im Fluss. */
+body.paged #viewer { padding: 0; }
 
 .pdfViewer .page {
   border: none;
@@ -708,4 +711,200 @@ body.dragging .drop .cover svg { stroke: var(--accent); transform: scale(1.25); 
   #glasslayer { display: none; }
   .glass { background: Canvas; color: CanvasText; border: 1px solid ButtonText; }
   .ico, .ico.on { color: ButtonText; }
+}
+
+/* ---------- Seitenleiste: nur Miniaturen ---------- */
+
+#thumbs {
+  --open: 0;
+  position: fixed;
+  z-index: 36;
+  left: 12px;
+  top: 62px;
+  bottom: 62px;
+  width: 124px;
+  visibility: hidden;
+  transform: translateX(calc((1 - var(--open)) * -148px));
+  opacity: calc(0.25 + var(--open) * 0.75);
+  transition: transform 0.46s var(--spring), opacity 0.3s var(--ease);
+  /* Oben und unten weich auslaufen statt hart abgeschnitten. */
+  -webkit-mask-image: linear-gradient(transparent, #000 26px, #000 calc(100% - 26px), transparent);
+  mask-image: linear-gradient(transparent, #000 26px, #000 calc(100% - 26px), transparent);
+}
+#thumbs.shown { visibility: visible; }
+#thumbs.dragging { transition: none; }
+#thumb-list {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 26px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  touch-action: pan-y;
+}
+#thumb-list::-webkit-scrollbar { display: none; }
+
+:is(.thumb, .cell) {
+  --ar: 0.707;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+}
+.thumb { width: 104px; }
+.cell { width: 180px; }
+:is(.thumb, .cell) .face {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: var(--ar);
+  border-radius: 3px;
+  background: #2b2b2e;
+  overflow: hidden;
+  /* Der leichte Schatten ist der ganze Kontrast zur Flaeche dahinter. */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 7px 18px rgba(0, 0, 0, 0.42);
+  transition: transform 0.3s var(--spring), box-shadow 0.25s var(--ease);
+}
+:is(.thumb, .cell) canvas { display: block; width: 100%; height: 100%; opacity: 0; transition: opacity 0.25s var(--ease); }
+:is(.thumb, .cell).ready canvas { opacity: 1; }
+:is(.thumb, .cell) .n { font-size: 10.5px; font-variant-numeric: tabular-nums; transition: color 0.2s var(--ease); }
+:is(.thumb, .cell):hover .face { transform: scale(1.035); }
+:is(.thumb, .cell).cur .face { box-shadow: 0 0 0 2px var(--accent), 0 7px 18px rgba(0, 0, 0, 0.42); }
+:is(.thumb, .cell).cur .n { color: var(--accent); }
+:is(.thumb, .cell):active .face { transform: scale(0.97); transition-duration: 0.08s; }
+:is(.thumb, .cell):focus-visible { outline: none; }
+:is(.thumb, .cell):focus-visible .face { box-shadow: 0 0 0 2px var(--ink), 0 7px 18px rgba(0, 0, 0, 0.42); }
+/* Lesezeichen: kleines Band an der oberen Ecke. */
+:is(.thumb, .cell).bm .face::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 7px;
+  width: 10px;
+  height: 15px;
+  background: var(--accent);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 74%, 0 100%);
+}
+#thumbs.invert .face, #sheet.invert .face { background: #101010; }
+#thumbs.invert canvas, #sheet.invert canvas { filter: var(--pdf-invert-filter); }
+
+/* Griff: zeigt, dass am Rand etwas wartet, und zieht die Leiste heraus. */
+#thumbs-grip {
+  position: fixed;
+  z-index: 37;
+  left: 0;
+  top: 50%;
+  translate: 0 -50%;
+  width: 18px;
+  height: 84px;
+  display: grid;
+  align-items: center;
+  justify-items: start;
+  cursor: grab;
+  touch-action: none;
+  transition: opacity 0.3s var(--ease);
+}
+#thumbs-grip span {
+  width: 4px;
+  height: 38px;
+  border-radius: 0 4px 4px 0;
+  background: rgba(255, 255, 255, 0.3);
+  transition: background 0.2s var(--ease), height 0.3s var(--spring), width 0.3s var(--spring);
+}
+#thumbs-grip:hover span, #thumbs-grip:focus-visible span { background: rgba(255, 255, 255, 0.75); height: 50px; width: 5px; }
+#thumbs-grip.open span { background: rgba(255, 255, 255, 0.14); }
+#thumbs-grip:focus-visible { outline: none; }
+#thumbs-edge { position: fixed; z-index: 35; left: 0; top: var(--bar-h); bottom: 0; width: 10px; touch-action: none; }
+body.bare #thumbs, body.bare #thumbs-grip, body.bare #thumbs-edge { opacity: 0; pointer-events: none; }
+
+/* ---------- Ansichtsmenue ---------- */
+
+#view-menu {
+  position: fixed;
+  z-index: 55;
+  width: 256px;
+  padding: 8px;
+  border: 1px solid #ffffff38;
+  border-radius: 20px;
+  color: #f5f5f7;
+  background: #262629ed;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 12px 40px #0005, inset 0 1px 0 #ffffff14;
+}
+#view-modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 6px; }
+#view-modes button {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px 4px 8px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  font-size: 11px;
+  color: var(--dim);
+}
+#view-modes svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+#view-modes button:hover { background: #ffffff12; }
+#view-modes button[aria-checked=true] { color: #a5d0ff; background: #75b8ff22; }
+.vm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  text-align: left;
+}
+.vm-row:hover { background: #ffffff12; }
+.vm-row kbd { color: var(--dim); font: inherit; font-size: 11px; }
+#view-bookmarks { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 8px 4px; }
+.vm-chip { padding: 4px 10px; border: 1px solid #ffffff30; border-radius: 999px; background: #ffffff10; font-size: 11.5px; }
+.vm-chip:hover { background: #ffffff25; }
+@media (prefers-reduced-transparency: reduce) { #view-menu { background: #262629; backdrop-filter: none; } }
+@media (forced-colors: active) { #view-menu { background: Canvas; color: CanvasText; } }
+
+/* ---------- Kontaktbogen ---------- */
+
+#sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 58;
+  overflow-y: auto;
+  padding: 0 28px 40px;
+  background: rgba(24, 24, 26, 0.96);
+  backdrop-filter: blur(30px);
+  animation: sheet-in 0.32s var(--ease);
+}
+#sheet > header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 -28px 8px;
+  padding: 14px 28px 12px;
+  background: linear-gradient(rgba(24, 24, 26, 0.98) 70%, transparent);
+}
+#sheet h2 { margin: 0; font-size: 15px; font-weight: 600; }
+#sheet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 26px 18px; justify-items: center; padding-top: 8px; }
+@keyframes sheet-in { from { opacity: 0; transform: scale(0.985); } }
+@media (prefers-reduced-motion: reduce) {
+  #thumbs, #thumbs-grip span, :is(.thumb, .cell) .face { transition: none; }
+  #sheet { animation: none; }
+}
+@media (forced-colors: active) {
+  #sheet { background: Canvas; }
+  :is(.thumb, .cell).cur .face { outline: 2px solid Highlight; }
 }

@@ -14,6 +14,10 @@ PDF-Reader für Windows. Tauri v2 (Rust + WebView2), Frontend in TypeScript mit 
 - Fortlaufendes Scrollen, Seiten werden nur im Sichtbereich gerendert
 - Zoom mit Strg+Rad, Ankerpunkt bleibt beim Zoomen erhalten
 - Single-Instance: ein Prozess für alle geöffneten Dateien
+- Seitenleiste nur mit Miniaturen: per Griff am linken Rand, Wischen mit zwei Fingern oder Strg+B heraus- und wieder hineinziehen
+- Kontaktbogen (K): alle Seiten als Raster
+- Ansicht: fortlaufend, Einzelseite, Doppelseite (Knopf neben dem Inhaltsverzeichnis)
+- Eigene Lesezeichen pro Dokument (Strg+D), unabhängig vom Dateipfad
 
 ## Tastatur
 
@@ -23,6 +27,10 @@ PDF-Reader für Windows. Tauri v2 (Rust + WebView2), Frontend in TypeScript mit 
 | Strg+F | Suchen |
 | Strg+S | Sichern |
 | Strg+I | Invertieren |
+| Strg+B | Seitenleiste |
+| K | Kontaktbogen |
+| Strg+D | Lesezeichen setzen/entfernen |
+| Bild↑ / Bild↓ | Seite blättern (Einzel-/Doppelseite) |
 | Strg + Rad | Zoom |
 | Strg+0 | Ausgangsbreite |
 | F3 | nächster Treffer |
