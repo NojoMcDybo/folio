@@ -6,6 +6,9 @@ const assert = require("assert");
   const out = (n) => OUT + "shot-" + n + ".png";
   const ok = (m) => console.log("ok  ", m);
 
+  // --- Ein normales Text-PDF zeigt nie den Hinweis der Texterkennung
+  assert.equal(await page.locator("#ocr-chip").isHidden(), true); ok("kein OCR-Hinweis bei Text-PDF");
+
   // --- Seitenleiste zu Beginn zu
   let open0 = await page.evaluate(() => getComputedStyle(document.getElementById("thumbs")).visibility);
   assert.equal(open0, "hidden"); ok("Seitenleiste anfangs unsichtbar");

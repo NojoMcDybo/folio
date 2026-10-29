@@ -23,6 +23,14 @@ function fakeOcr({ __bytes }) {
   const { browser, page, state, calls, logs } = await open("scan.pdf");
   state.handlers.ocr_page = fakeOcr;
   const wait = (ms = 800) => page.waitForTimeout(ms);
+  // Geometrie ueber das DOM statt locator.boundingBox(): die Ebene wird beim Zeichnen weiterer Seiten neu
+  // angelegt, und boundingBox() liefert in genau diesem Augenblick null.
+  const box = (text) => page.evaluate((t) => {
+    const e = [...document.querySelectorAll(".ocr-word")].find((w) => w.textContent.includes(t));
+    if (!e) return null;
+    const b = e.getBoundingClientRect();
+    return { x: b.x, y: b.y, width: b.width, height: b.height };
+  }, text);
   // Die Erkennung läuft beim Zeichnen der ersten Seite; Handler war noch nicht gesetzt -> neu erzwingen
   await page.click("#b-view");
   await page.click("#view-ocr-now");
@@ -34,7 +42,7 @@ function fakeOcr({ __bytes }) {
   await page.screenshot({ path: OUT + "shot-ocr.png" });
 
   // ---- Auswahl: Zeile markieren (Dreifachklick) und Text prüfen
-  const w = await page.locator(".ocr-word", { hasText: "Münster," }).boundingBox();
+  const w = await box("Münster,");
   await page.mouse.click(w.x + 8, w.y + w.height / 2, { clickCount: 3 });
   const sel = await page.evaluate(() => window.getSelection().toString());
   console.log("     Auswahl:", JSON.stringify(sel));
@@ -45,14 +53,14 @@ function fakeOcr({ __bytes }) {
   calls.length = 0;
   console.log("     Wörter jetzt:", await page.$$eval(".ocr-word", (els) => els.map((e) => e.textContent).join("|")));
   console.log("     Boxen:", JSON.stringify(await page.$$eval(".ocr-word", (els) => els.slice(-3).map((e) => { const b = e.getBoundingClientRect(); return [e.textContent, Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height), e.style.cssText.slice(0, 120)]; }))));
-  const url = await page.locator(".ocr-word", { hasText: "https://example.org/info" }).first().boundingBox();
+  const url = await box("https://example.org/info");
   await page.mouse.click(url.x + url.width / 2, url.y + url.height / 2);
   await wait(300);
   const opened = calls.find((c) => c.cmd === "plugin:opener|open_url");
   assert(opened && /example.org\/info/.test(JSON.stringify(opened.args))); ok("Klick auf URL: " + JSON.stringify(opened.args));
 
   // ---- Rechtsklick auf Telefonnummer
-  const tel = await page.locator(".ocr-word", { hasText: "0251" }).first().boundingBox();
+  const tel = await box("0251");
   await page.mouse.click(tel.x + 10, tel.y + tel.height / 2, { button: "right" });
   await wait(200);
   const items = await page.$$eval("#text-menu button", (els) => els.map((e) => e.textContent.trim()));
@@ -66,7 +74,7 @@ function fakeOcr({ __bytes }) {
   assert(call && /tel:02518322222/.test(JSON.stringify(call.args))); ok("tel:-Adresse geöffnet: " + JSON.stringify(call.args));
 
   // Rechtsklick auf Einzelwort -> Nachschlagen
-  const gw = await page.locator(".ocr-word", { hasText: "Fachbereich" }).first().boundingBox();
+  const gw = await box("Fachbereich");
   await page.mouse.click(gw.x + 10, gw.y + gw.height / 2, { button: "right" });
   await wait(200);
   const items2 = await page.$$eval("#text-menu button", (els) => els.map((e) => e.textContent.trim()));

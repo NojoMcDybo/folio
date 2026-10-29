@@ -22,7 +22,8 @@ type State = OcrPage | "none" | "pending" | "failed";
 export type OcrOptions = {
   pageDiv: (page: number) => HTMLElement | null;
   say: (message: string) => void;
-  /** Anzahl noch wartender/laufender Seiten (0 = fertig) und die aktuelle Seite. */
+  /** Anzahl noch wartender/laufender Seiten (0 = fertig, -1 = abbrechen ohne Meldung) und die aktuelle Seite.
+   *  Wird nur gemeldet, wenn wirklich erkannt wird - nicht schon beim blossen Pruefen, ob eine Seite Text hat. */
   busy: (waiting: number, page: number | null) => void;
   /** Erkannte Seiten haben sich geaendert (Menue aktualisieren). */
   changed: () => void;
@@ -37,6 +38,8 @@ export class OcrLayer {
   private states = new Map<number, State>();
   private queue: number[] = [];
   private running = false;
+  /** Lief in diesem Durchgang eine echte Erkennung? Nur dann gibt es am Ende eine Meldung. */
+  private ocrRan = false;
   private generation = 0;
   private enabled = loadOcrEnabled();
   private warned = false;
@@ -49,7 +52,7 @@ export class OcrLayer {
   setEnabled(on: boolean) {
     this.enabled = on;
     try { localStorage.setItem(STORE, on ? "on" : "off"); } catch { /* egal */ }
-    if (!on) { this.queue = []; this.o.busy(0, null); }
+    if (!on) { this.queue = []; this.ocrRan = false; this.o.busy(-1, null); }
     this.o.changed();
   }
 
@@ -59,7 +62,8 @@ export class OcrLayer {
     this.states.clear();
     this.queue = [];
     this.warned = false;
-    this.o.busy(0, null);
+    this.ocrRan = false;
+    this.o.busy(-1, null);
     this.o.changed();
   }
 
@@ -90,7 +94,6 @@ export class OcrLayer {
     // Zuletzt gezeigte Seite zuerst: das ist die, die der Benutzer gerade liest.
     this.queue = [page, ...this.queue.filter((p) => p !== page)];
     if (force) this.forced.add(page);
-    this.o.busy(this.queue.length + (this.running ? 1 : 0), null);
     void this.pump();
   }
 
@@ -103,12 +106,12 @@ export class OcrLayer {
     try {
       while (this.queue.length && generation === this.generation) {
         const page = this.queue.shift()!;
-        this.o.busy(this.queue.length + 1, page);
         await this.run(page, generation);
+        if (this.ocrRan && generation === this.generation && this.queue.length) this.o.busy(this.queue.length + 1, this.queue[0]);
       }
     } finally {
       this.running = false;
-      if (generation === this.generation) this.o.busy(0, null);
+      if (generation === this.generation && this.ocrRan) { this.ocrRan = false; this.o.busy(0, null); }
     }
   }
 
@@ -123,6 +126,9 @@ export class OcrLayer {
         const chars = text.items.reduce((sum, it) => sum + ("str" in it ? it.str.replace(/\s/g, "").length : 0), 0);
         if (chars >= MIN_TEXT) { page.cleanup(); if (generation === this.generation) this.states.set(n, "none"); return; }
       }
+      // Ab hier wird wirklich erkannt: der Hinweis oben erscheint.
+      this.ocrRan = true;
+      this.o.busy(this.queue.length + 1, n);
       const base = page.getViewport({ scale: 1 });
       const long = Math.max(base.width, base.height);
       // Nie groesser als das, was Windows.Media.Ocr annimmt (MaxImageDimension, meist 10000).
