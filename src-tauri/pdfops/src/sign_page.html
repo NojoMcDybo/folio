@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="referrer" content="no-referrer">
+<title>Unterschrift</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f2f2f4; --ink: #1c1c1e; --dim: #6e6e73; --card: #fff; --accent: #0a84ff; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #151517; --ink: #f5f5f7; --dim: #a1a1a6; --card: #232326; } }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 22px 18px 28px; display: grid; gap: 14px; min-height: 100%; grid-template-rows: auto auto 1fr auto auto; }
+  h1 { margin: 0; font-size: 22px; font-weight: 650; }
+  .sub { margin: 0; color: var(--dim); font-size: 14px; }
+  .pad { position: relative; background: #fff; border-radius: 18px; box-shadow: 0 1px 0 #0001, 0 8px 28px #0002; min-height: 220px; overflow: hidden; touch-action: none; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .line { position: absolute; left: 7%; right: 7%; bottom: 32%; border-bottom: 1.5px dashed #c7c7cc; pointer-events: none; }
+  .x { position: absolute; left: 7%; bottom: 34%; color: #b0b0b5; font-size: 22px; pointer-events: none; }
+  .row { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+  button { font: inherit; font-weight: 600; padding: 15px; border: 0; border-radius: 14px; background: var(--card); color: var(--ink); box-shadow: 0 1px 0 #0001; }
+  button#send { background: var(--accent); color: #fff; }
+  button:disabled { opacity: .45; }
+  #msg { min-height: 1.4em; margin: 0; text-align: center; color: var(--dim); font-size: 14px; }
+  #msg.ok { color: #1c9c55; font-weight: 600; } #msg.err { color: #d93a32; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Bitte hier unterschreiben</h1>
+  <p class="sub">Mit dem Finger oder einem Stift in das Feld schreiben. Am besten das Handy quer halten.</p>
+  <div class="pad" id="pad"><span class="x">×</span><div class="line"></div><canvas id="c"></canvas></div>
+  <div class="row"><button id="clear" type="button">Neu</button><button id="send" type="button" disabled>An den Computer senden</button></div>
+  <p id="msg" role="status"></p>
+</main>
+<script>
+(function () {
+  var pad = document.getElementById("pad"), cv = document.getElementById("c"), ctx = cv.getContext("2d");
+  var send = document.getElementById("send"), clear = document.getElementById("clear"), msg = document.getElementById("msg");
+  var dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1)), strokes = [], cur = null, done = false;
+  var box = null;
+  function fit() {
+    var r = pad.getBoundingClientRect();
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    redraw();
+  }
+  function style() { ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#111"; ctx.fillStyle = "#111"; }
+  function width(p) { return (2.4 + 2.4 * (p.p || 0.5)) * dpr; }
+  function seg(a, b, c) {
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo(b.x, b.y, (b.x + c.x) / 2, (b.y + c.y) / 2);
+    ctx.lineWidth = width(b); ctx.stroke();
+  }
+  function redraw() {
+    ctx.clearRect(0, 0, cv.width, cv.height); style();
+    strokes.forEach(function (s) {
+      if (s.length === 1) { ctx.beginPath(); ctx.arc(s[0].x, s[0].y, width(s[0]) / 2, 0, 7); ctx.fill(); return; }
+      for (var i = 1; i < s.length; i++) seg(s[Math.max(0, i - 2)], s[i - 1], s[i]);
+    });
+  }
+  function pt(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr, p: e.pointerType === "pen" ? e.pressure : 0.5 }; }
+  function grow(p) { var w = width(p); box = box ? { x0: Math.min(box.x0, p.x - w), y0: Math.min(box.y0, p.y - w), x1: Math.max(box.x1, p.x + w), y1: Math.max(box.y1, p.y + w) } : { x0: p.x - w, y0: p.y - w, x1: p.x + w, y1: p.y + w }; }
+  cv.addEventListener("pointerdown", function (e) {
+    if (done) return; e.preventDefault(); cv.setPointerCapture(e.pointerId);
+    var p = pt(e); cur = [p]; strokes.push(cur); grow(p); style(); ctx.beginPath(); ctx.arc(p.x, p.y, width(p) / 2, 0, 7); ctx.fill(); send.disabled = false; msg.textContent = "";
+  });
+  cv.addEventListener("pointermove", function (e) {
+    if (!cur) return; e.preventDefault();
+    (e.getCoalescedEvents ? e.getCoalescedEvents() : [e]).forEach(function (ev) {
+      var p = pt(ev); cur.push(p); grow(p); var n = cur.length; if (n > 1) seg(cur[Math.max(0, n - 3)], cur[n - 2], cur[n - 1]);
+    });
+  });
+  function up() { cur = null; }
+  cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+  clear.addEventListener("click", function () { strokes = []; box = null; send.disabled = true; ctx.clearRect(0, 0, cv.width, cv.height); msg.textContent = ""; });
+  send.addEventListener("click", function () {
+    if (!box || done) return;
+    var pad2 = 10 * dpr, x = Math.max(0, box.x0 - pad2), y = Math.max(0, box.y0 - pad2);
+    var w = Math.min(cv.width, box.x1 + pad2) - x, h = Math.min(cv.height, box.y1 + pad2) - y;
+    var scale = Math.min(1, 900 / w), out = document.createElement("canvas");
+    out.width = Math.max(1, Math.round(w * scale)); out.height = Math.max(1, Math.round(h * scale));
+    out.getContext("2d").drawImage(cv, x, y, w, h, 0, 0, out.width, out.height);
+    send.disabled = true; msg.className = ""; msg.textContent = "Wird gesendet …";
+    out.toBlob(function (blob) {
+      fetch(location.pathname.replace(/\/+$/, "") + "/png", { method: "POST", body: blob, headers: { "Content-Type": "image/png" } })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); done = true; msg.className = "ok"; msg.textContent = "Gesendet ✓ Du kannst dieses Fenster schließen."; clear.disabled = true; })
+        .catch(function () { send.disabled = false; msg.className = "err"; msg.textContent = "Senden fehlgeschlagen. Ist der Computer noch im selben WLAN?"; });
+    }, "image/png");
+  });
+  window.addEventListener("resize", function () { if (!done) fit(); });
+  fit();
+})();
+</script>
+</body>
+</html>

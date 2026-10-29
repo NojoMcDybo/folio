@@ -2,6 +2,7 @@ mod file_safety;
 mod notch;
 mod ocr;
 mod pdf_tools;
+mod sign;
 
 use file_safety::{decode_hex_path, FileState};
 use std::path::PathBuf;
@@ -90,6 +91,7 @@ pub fn run() {
 
     builder
         .manage(FileState::default())
+        .manage(sign::SignState::default())
         .setup(|_| {
             // Erst hier, nicht vor dem Builder: ein zweiter Start beendet sich schon im
             // Single-Instance-Plugin und darf der laufenden Instanz die Ablage nicht wegraeumen.
@@ -113,6 +115,10 @@ pub fn run() {
             pdf_tools::pdf_edit,
             pdf_tools::pdf_embed_text,
             ocr::ocr_page,
+            sign::sign_start,
+            sign::sign_status,
+            sign::sign_take,
+            sign::sign_stop,
             pdf_tools::read_pdf_plain,
             pdf_tools::write_pdf_copy,
             pdf_tools::temp_file,

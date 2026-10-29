@@ -24,6 +24,9 @@ PDF-Reader für Windows. Tauri v2 (Rust + WebView2), Frontend in TypeScript mit 
 - Texterkennung (Windows.Media.Ocr, offline) für Seiten ohne eigenen Text: erkannte Wörter lassen sich markieren und kopieren,
   Adressen, E-Mails und Telefonnummern werden zu Links; Rechtsklick auf Text: kopieren, nachschlagen, übersetzen, im Web suchen.
   Optional wird der erkannte Text unsichtbar ins PDF geschrieben (durchsuchbar in jedem Programm). Braucht das Windows-Sprachpaket.
+- Unterschreiben (Strg+Umschalt+U): QR-Code scannen, am Handy im Browser unterschreiben, die Unterschrift landet als verschiebbarer Stempel
+  im Dokument. Läuft nur über das eigene WLAN (kleiner lokaler Server mit Einmal-Schlüssel, 10 Minuten gültig); alternativ im Fenster
+  zeichnen oder eine gemerkte Unterschrift wiederverwenden.
 - Inhaltsverzeichnis: ohne Lesezeichen in der Datei liest Folio ein gedrucktes Verzeichnis oder erkennt Überschriften an ihrer Größe.
 
 ## Tastatur

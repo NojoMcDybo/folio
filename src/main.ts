@@ -27,6 +27,7 @@ import { mergeBytes } from "./merge";
 import { OcrLayer, embedPayload, frameEmbed } from "./ocr";
 import { detectEntities, entityAt, type Entity } from "./detect";
 import { cleanSelection, textMenuItems } from "./text-actions";
+import { SignDialog } from "./signature";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -355,6 +356,7 @@ const viewMenu = new ViewMenu(
     toggleBookmark,
     goTo: goToPage,
     pages: (x, y) => openPageMenu(x, y),
+    sign: () => void startSigning(),
     toggleOcr: () => ocr.setEnabled(!ocr.isEnabled),
     ocrNow: () => { viewMenu.close(); void ocr.recognizeNow(pdfViewer.currentPageNumber); say("Text wird erkannt …"); },
     embedOcr: () => void embedRecognizedText(),
@@ -489,6 +491,60 @@ async function embedRecognizedText() {
   const ok = await editor.transform("Erkannten Text einbetten", async (_doc, before) =>
     new Uint8Array(await invoke<ArrayBuffer>("pdf_embed_text", frameEmbed(pages, before))));
   if (ok) say(`Text auf ${recognized.size === 1 ? "1 Seite" : `${recognized.size} Seiten`} eingebettet – beim Sichern wird er Teil der PDF`);
+}
+
+// ---------- Unterschreiben ----------
+
+const signDialog = new SignDialog($<HTMLDialogElement>("sign"));
+
+function imageSize(src: string): Promise<{ w: number; h: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => reject(new Error("Bild nicht lesbar"));
+    img.src = src;
+  });
+}
+
+async function startSigning() {
+  if (!pdfViewer.pdfDocument) return;
+  const png = await signDialog.open();
+  if (png) await placeSignature(png);
+}
+
+/** Setzt die Unterschrift als Bild-Stempel in die Mitte des sichtbaren Teils der aktuellen Seite.
+ *  Danach laesst sie sich verschieben und in der Groesse aendern wie jede Anmerkung. */
+async function placeSignature(png: string) {
+  try {
+    const view = pdfViewer.getPageView(pdfViewer.currentPageNumber - 1);
+    openAnn();
+    setTool("stamp");
+    // Die Editor-Ebene der Seite entsteht erst mit dem Moduswechsel.
+    for (let i = 0; i < 20 && !view?.annotationEditorLayer?.annotationEditorLayer; i++) await new Promise((r) => setTimeout(r, 50));
+    const layer = view?.annotationEditorLayer?.annotationEditorLayer;
+    if (!layer?.createAndAddNewEditor) throw new Error("Editor-Ebene nicht bereit");
+    const { w, h } = await imageSize(png);
+    const box = (layer.div as HTMLElement).getBoundingClientRect();
+    const cx = (Math.max(0, box.left) + Math.min(innerWidth, box.right)) / 2 - box.left;
+    const cy = (Math.max(0, box.top) + Math.min(innerHeight, box.bottom)) / 2 - box.top;
+    const editor = layer.createAndAddNewEditor({ offsetX: cx, offsetY: cy }, true, { bitmapUrl: png });
+    if (editor) {
+      // Etwa ein Viertel der Seitenbreite, Seitenverhaeltnis der Unterschrift bleibt.
+      const widthFraction = 0.26;
+      editor.width = widthFraction;
+      editor.height = widthFraction * (box.width / box.height) * (h / w);
+    }
+    say("Unterschrift eingefügt – verschieben, Größe ziehen, dann Strg+S");
+  } catch (error) {
+    // Rueckfall: ins Zwischenablage-Bild legen; im Stempel-Modus fuegt PDF.js es mit Strg+V ein.
+    try {
+      const blob = await (await fetch(png)).blob();
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      say("Unterschrift liegt in der Zwischenablage – mit Strg+V einfügen");
+    } catch {
+      say("Unterschrift konnte nicht eingefügt werden: " + String(error));
+    }
+  }
 }
 
 // ---------- Text: Rechtsklick und Links ----------
@@ -965,6 +1021,8 @@ const TOOL_MODE: Record<string, number> = {
   mark: EditorType.HIGHLIGHT,
   ink: EditorType.INK,
   text: EditorType.FREETEXT,
+  // Unterschriften sind Bild-Stempel; kein eigener Knopf, sie werden ueber "Unterschreiben" gesetzt.
+  stamp: EditorType.STAMP,
 };
 
 const toolBtn: Record<string, HTMLButtonElement> = {
@@ -989,7 +1047,7 @@ function paintTool(key: string) {
 function setTool(next: string) {
   tool = next;
   document.body.dataset.tool = next;
-  if (next !== "none") armed = next;
+  if (next !== "none" && next !== "stamp") armed = next;
   paintTool(next);
   if (!pdfViewer.pdfDocument) return;
   // "switchannotationeditormode" wird von PDF.js nur gesendet, nicht
@@ -1521,6 +1579,7 @@ window.addEventListener("keydown", (e) => {
 
   if (ctrl && k === "o") { e.preventDefault(); void pick(); }
   else if (ctrl && k === "b") { e.preventDefault(); sidebar.toggle(); }
+  else if (ctrl && e.shiftKey && k === "u") { e.preventDefault(); void startSigning(); }
   else if (ctrl && k === "d") { e.preventDefault(); toggleBookmark(); }
   // Seiten-Rueckgaengig gilt, solange nach der letzten Seitenoperation nichts markiert/gezeichnet
   // wurde - sonst gehoert Strg+Z dem Stift und den Textfeldern (PDF.js' eigener Verlauf).
