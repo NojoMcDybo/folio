@@ -9,11 +9,18 @@
 use lopdf::{Dictionary, Document, Object, ObjectId};
 use std::fmt;
 
+pub mod cli;
+pub(crate) mod colors;
 pub mod files;
+pub(crate) mod flatten;
+pub(crate) mod images;
+pub mod optimize;
 pub mod pages;
+pub(crate) mod resources;
 pub mod signing;
 pub mod text;
 
+pub use optimize::{optimize, preset, OptimizeOptions, Report};
 pub use pages::{apply, Edit};
 
 #[derive(Debug)]

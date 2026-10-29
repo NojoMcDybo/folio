@@ -140,9 +140,10 @@ export class OcrLayer {
         headers: { "x-lang": navigator.language || "" },
       });
       if (generation !== this.generation) return;
-      const words = result.lines.reduce((sum, l) => sum + l.words.length, 0);
+      const lines = result?.lines ?? [];
+      const words = lines.reduce((sum, l) => sum + l.words.length, 0);
       if (!words) { this.states.set(n, "none"); return; }
-      const recognized: OcrPage = { lang: result.lang, width: canvas.width, height: canvas.height, lines: result.lines };
+      const recognized: OcrPage = { lang: result.lang, width: canvas.width, height: canvas.height, lines };
       this.states.set(n, recognized);
       const div = this.o.pageDiv(n);
       if (div) this.attach(div, recognized);

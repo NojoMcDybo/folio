@@ -5,8 +5,9 @@
 //! (unsichtbar), mit Helvetica/WinAnsi. Der vorhandene Inhalt wird in `q ... Q` gefasst: ein
 //! unausgewogener Grafikzustand der Seite darf unsere Positionen nicht verschieben.
 
+use crate::resources::{add_resource, append_content, brackets};
 use crate::{Error, Result};
-use lopdf::{dictionary, Document, Object, ObjectId, Stream};
+use lopdf::{dictionary, Document, ObjectId};
 use serde::Deserialize;
 
 /// Ein erkanntes Wort in den Koordinaten der *unrotierten* Seite (PDF-Benutzereinheiten):
@@ -97,70 +98,6 @@ fn content_for(words: &[Word]) -> Option<String> {
     any.then_some(out)
 }
 
-/// Das Wörterbuch, das `Resources` eines Seitenbaum-Knotens besitzt (die Seite selbst oder ein Vorfahr).
-fn resources_owner(doc: &Document, page: ObjectId) -> ObjectId {
-    let mut id = page;
-    for _ in 0..64 {
-        let Ok(dict) = doc.get_dictionary(id) else { break };
-        if dict.has(b"Resources") {
-            return id;
-        }
-        match dict.get(b"Parent").and_then(Object::as_reference) {
-            Ok(parent) => id = parent,
-            Err(_) => break,
-        }
-    }
-    page
-}
-
-/// Traegt die Schrift `FoOCR` in die Ressourcen der Seite ein. Geerbte Ressourcen werden am
-/// Besitzer ergaenzt (ein zusaetzlicher Schrifteintrag schadet den anderen Seiten nicht).
-fn add_font(doc: &mut Document, page: ObjectId, font: ObjectId) -> Result<()> {
-    let owner = resources_owner(doc, page);
-    // Resources immer als eigenes Objekt, damit sich Direkt- und Verweisfall gleich behandeln lassen.
-    let res_id = match doc.get_dictionary(owner)?.get(b"Resources") {
-        Ok(Object::Reference(r)) => *r,
-        Ok(Object::Dictionary(d)) => {
-            let id = doc.add_object(Object::Dictionary(d.clone()));
-            doc.get_object_mut(owner)?.as_dict_mut()?.set("Resources", Object::Reference(id));
-            id
-        }
-        _ => {
-            let id = doc.add_object(Object::Dictionary(dictionary! {}));
-            doc.get_object_mut(owner)?.as_dict_mut()?.set("Resources", Object::Reference(id));
-            id
-        }
-    };
-    let font_dict_id = match doc.get_dictionary(res_id)?.get(b"Font") {
-        Ok(Object::Reference(r)) => Some(*r),
-        _ => None,
-    };
-    match font_dict_id {
-        Some(fid) => doc.get_object_mut(fid)?.as_dict_mut()?.set("FoOCR", Object::Reference(font)),
-        None => {
-            let res = doc.get_object_mut(res_id)?.as_dict_mut()?;
-            if let Ok(Object::Dictionary(fonts)) = res.get_mut(b"Font") {
-                fonts.set("FoOCR", Object::Reference(font));
-            } else {
-                res.set("Font", Object::Dictionary(dictionary! { "FoOCR" => Object::Reference(font) }));
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Seiteninhalt als Liste von Strom-Verweisen.
-fn content_refs(doc: &Document, page: ObjectId) -> Vec<Object> {
-    match doc.get_dictionary(page).ok().and_then(|d| d.get(b"Contents").ok()) {
-        Some(Object::Reference(r)) => match doc.get_object(*r) {
-            Ok(Object::Array(items)) => items.clone(),
-            _ => vec![Object::Reference(*r)],
-        },
-        Some(Object::Array(items)) => items.clone(),
-        _ => vec![],
-    }
-}
-
 pub fn embed_text(bytes: &[u8], pages: &[PageText]) -> Result<Vec<u8>> {
     let mut doc = Document::load_mem(bytes)?;
     if doc.is_encrypted() {
@@ -170,19 +107,13 @@ pub fn embed_text(bytes: &[u8], pages: &[PageText]) -> Result<Vec<u8>> {
     let font = doc.add_object(dictionary! {
         "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica", "Encoding" => "WinAnsiEncoding",
     });
-    let open = doc.add_object(Stream::new(dictionary! {}, b"q\n".to_vec()));
-    let close = doc.add_object(Stream::new(dictionary! {}, b"\nQ\n".to_vec()));
+    let wrap = brackets(&mut doc);
 
     for p in pages {
         let id = *ids.get(p.page).ok_or_else(|| Error::Invalid(format!("Seite {} gibt es nicht.", p.page + 1)))?;
         let Some(content) = content_for(&p.words) else { continue };
-        add_font(&mut doc, id, font)?;
-        let ours = doc.add_object(Stream::new(dictionary! {}, content.into_bytes()));
-        let mut contents = vec![Object::Reference(open)];
-        contents.extend(content_refs(&doc, id));
-        contents.push(Object::Reference(close));
-        contents.push(Object::Reference(ours));
-        doc.get_object_mut(id)?.as_dict_mut()?.set("Contents", Object::Array(contents));
+        add_resource(&mut doc, id, "Font", "FoOCR", font)?;
+        append_content(&mut doc, id, wrap, content.into_bytes())?;
     }
 
     let mut out = Vec::with_capacity(bytes.len() + 4096);

@@ -27,6 +27,9 @@ PDF-Reader für Windows. Tauri v2 (Rust + WebView2), Frontend in TypeScript mit 
 - Unterschreiben (Strg+Umschalt+U): QR-Code scannen, am Handy im Browser unterschreiben, die Unterschrift landet als verschiebbarer Stempel
   im Dokument. Läuft nur über das eigene WLAN (kleiner lokaler Server mit Einmal-Schlüssel, 10 Minuten gültig); alternativ im Fenster
   zeichnen oder eine gemerkte Unterschrift wiederverwenden.
+- Verkleinern und umwandeln (Menü Ansicht): Bilder auf 100/150/220 dpi, Schwarzweiß, Anmerkungen und Formularfelder einbrennen –
+  als Kopie sichern oder auf das Dokument anwenden (rückgängig machbar). Dasselbe ohne Fenster: `folio --compress|--gray|--flatten <PDF>`,
+  siehe [docs/notch-integration.md](docs/notch-integration.md).
 - Inhaltsverzeichnis: ohne Lesezeichen in der Datei liest Folio ein gedrucktes Verzeichnis oder erkennt Überschriften an ihrer Größe.
 
 ## Tastatur
@@ -51,6 +54,19 @@ PDF-Reader für Windows. Tauri v2 (Rust + WebView2), Frontend in TypeScript mit 
 | F11 | Bedienung aus |
 | M / Z / T | Marker, Stift, Textfeld |
 | V | Werkzeug weg |
+
+## Kommandozeile
+
+```
+folio --compress <PDF> [--preset screen|mail|print] [--out <Datei>]
+folio --gray <PDF>        folio --flatten <PDF>        folio --optimize <PDF> --dpi 150 --gray --flatten
+```
+Arbeitet ohne Fenster, schreibt nie über eine vorhandene Datei und liefert einen JSON-Bericht (Details: `docs/notch-integration.md`).
+
+## Tests
+
+`npm test` (Logik), `cargo test -p folio-pdfops` im Ordner `src-tauri` (PDF-Bearbeitung, Unterschriften-Server, Kommandozeile),
+`tests/browser` (Oberfläche im Chromium, siehe dort).
 
 ## Entwickeln
 

@@ -28,6 +28,7 @@ import { OcrLayer, embedPayload, frameEmbed } from "./ocr";
 import { detectEntities, entityAt, type Entity } from "./detect";
 import { cleanSelection, textMenuItems } from "./text-actions";
 import { SignDialog } from "./signature";
+import { OptimizeDialog, splitReport, summary } from "./optimize";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -356,6 +357,7 @@ const viewMenu = new ViewMenu(
     toggleBookmark,
     goTo: goToPage,
     pages: (x, y) => openPageMenu(x, y),
+    optimize: () => void optimizeDocument(),
     sign: () => void startSigning(),
     toggleOcr: () => ocr.setEnabled(!ocr.isEnabled),
     ocrNow: () => { viewMenu.close(); void ocr.recognizeNow(pdfViewer.currentPageNumber); say("Text wird erkannt …"); },
@@ -491,6 +493,48 @@ async function embedRecognizedText() {
   const ok = await editor.transform("Erkannten Text einbetten", async (_doc, before) =>
     new Uint8Array(await invoke<ArrayBuffer>("pdf_embed_text", frameEmbed(pages, before))));
   if (ok) say(`Text auf ${recognized.size === 1 ? "1 Seite" : `${recognized.size} Seiten`} eingebettet – beim Sichern wird er Teil der PDF`);
+}
+
+// ---------- Verkleinern und umwandeln ----------
+
+const optimizeDialog = new OptimizeDialog($<HTMLDialogElement>("optimize"));
+
+async function optimizeDocument() {
+  const doc = pdfViewer.pdfDocument;
+  if (!doc || editor.busy) return;
+  const choice = await optimizeDialog.open();
+  if (!choice) return;
+  const opts = { dpi: choice.dpi, quality: choice.quality, gray: choice.gray, flatten: choice.flatten };
+  const label = choice.gray && choice.dpi === null && !choice.flatten ? "Schwarzweiß"
+    : choice.flatten && choice.dpi === null && !choice.gray ? "Anmerkungen einbrennen" : "Verkleinern";
+  say("Wird verarbeitet …");
+  try {
+    reader.inert = true;
+    document.body.classList.add("working");
+    // Mit eingebacken: noch nicht gesicherte Markierungen und Unterschriften gehen nicht verloren.
+    const { report, pdf } = splitReport(await invoke<ArrayBuffer>("pdf_optimize", await documentBytes(doc), {
+      headers: { "x-opts": JSON.stringify(opts) },
+    }));
+    document.body.classList.remove("working");
+    reader.inert = false;
+
+    if (choice.target === "here") {
+      if (!choice.gray && !choice.flatten && report.after >= report.before) { say("Die Datei ließ sich nicht weiter verkleinern."); return; }
+      if (await editor.transform(label, async () => pdf)) say(`${summary(report)} – beim Sichern wird die Datei ersetzt`);
+      return;
+    }
+    const stem = (currentPath ?? "Dokument").split(/[\\/]/).pop()!.replace(/\.pdf$/i, "");
+    const word = choice.gray && choice.dpi === null && !choice.flatten ? "schwarzweiß" : choice.dpi !== null && !choice.gray && !choice.flatten ? "komprimiert" : "optimiert";
+    const target = await saveDialog({ defaultPath: `${stem} (${word}).pdf`, filters: PDF_FILTER });
+    if (!target) return;
+    await invoke("write_pdf_copy", pdf, { headers: { "x-path": hex(target) } });
+    say(`${target.split(/[\\/]/).pop()}: ${summary(report)}${report.warnings.length ? " · " + report.warnings[0] : ""}`);
+  } catch (error) {
+    say("Verarbeiten fehlgeschlagen: " + String(error));
+  } finally {
+    document.body.classList.remove("working");
+    reader.inert = false;
+  }
 }
 
 // ---------- Unterschreiben ----------

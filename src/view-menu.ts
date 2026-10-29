@@ -12,6 +12,7 @@ export type ViewMenuActions = {
   toggleBookmark: () => void;
   goTo: (page: number) => void;
   pages: (x: number, y: number) => void;
+  optimize: () => void;
   sign: () => void;
   toggleOcr: () => void;
   ocrNow: () => void;
@@ -41,6 +42,7 @@ export class ViewMenu {
       this.close();
       actions.pages(r.left, r.top + 120);
     });
+    menu.querySelector("#view-optimize")!.addEventListener("click", () => { this.close(); actions.optimize(); });
     menu.querySelector("#view-sign")!.addEventListener("click", () => { this.close(); actions.sign(); });
     menu.querySelector("#view-ocr")!.addEventListener("click", () => actions.toggleOcr());
     menu.querySelector("#view-ocr-now")!.addEventListener("click", () => { this.close(); actions.ocrNow(); });

@@ -13,3 +13,6 @@ Thumbs.db
 
 # Lokale Testdateien, Installationspruefung und Arbeitsnotizen
 work/
+
+# Browser-Tests: erzeugte PDFs
+tests/browser/fixtures/

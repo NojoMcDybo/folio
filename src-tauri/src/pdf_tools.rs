@@ -147,3 +147,23 @@ pub async fn pdf_embed_text(request: Request<'_>) -> Result<Response, String> {
     .map_err(|e| e.to_string())??;
     Ok(Response::new(out))
 }
+
+/// Verkleinern, Schwarzweiss, Einbrennen (`x-opts`: JSON mit `folio_pdfops::OptimizeOptions`).
+/// Antwort: 4 Byte Laenge (little endian) des Berichts als JSON, danach die neue PDF.
+#[tauri::command]
+pub async fn pdf_optimize(request: Request<'_>) -> Result<Response, String> {
+    let opts: folio_pdfops::OptimizeOptions = serde_json::from_str(header(&request, "x-opts")?).map_err(|e| e.to_string())?;
+    let bytes = body(&request)?;
+    let framed = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<u8>, String> {
+        let (pdf, report) = folio_pdfops::optimize(&bytes, &opts).map_err(|e| e.to_string())?;
+        let json = serde_json::to_vec(&report).map_err(|e| e.to_string())?;
+        let mut out = Vec::with_capacity(4 + json.len() + pdf.len());
+        out.extend_from_slice(&(json.len() as u32).to_le_bytes());
+        out.extend_from_slice(&json);
+        out.extend_from_slice(&pdf);
+        Ok(out)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    Ok(Response::new(framed))
+}

@@ -1118,3 +1118,28 @@ body[data-tool]:not([data-tool="none"]) .ocrLayer { pointer-events: none; }
 .sign-use img { display: block; max-width: 100%; max-height: 100%; margin: auto; object-fit: contain; }
 .sign-del { border: 0; background: transparent; color: var(--dim); font-size: 11px; text-decoration: underline; }
 .sign-del:hover { color: #ffb5af; }
+
+/* ---------- Verkleinern und umwandeln ---------- */
+
+#optimize {
+  padding: 0;
+  width: min(520px, calc(100vw - 24px));
+  border: 1px solid #ffffff2e;
+  border-radius: 22px;
+  color: var(--ink);
+  background: #262629;
+  box-shadow: 0 24px 80px #000a;
+}
+#optimize::backdrop { background: #000a; }
+.opt-box { display: grid; gap: 14px; padding: 20px 22px 18px; margin: 0; }
+.opt-box h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.opt-group { display: grid; gap: 8px; margin: 0; padding: 12px 14px; border: 1px solid #ffffff1c; border-radius: 14px; }
+.opt-group legend { padding: 0 6px; color: var(--dim); font-size: 12px; }
+.opt-box label { display: flex; align-items: baseline; gap: 8px; cursor: pointer; }
+.opt-box label span { color: var(--dim); font-size: 12px; }
+.opt-check { flex-wrap: wrap; }
+.opt-check span { flex-basis: 100%; margin-left: 24px; }
+.opt-box input { accent-color: var(--accent); }
+.opt-note { margin: 0; color: var(--dim); font-size: 12px; }
+.opt-box .askrow { justify-content: flex-end; flex-wrap: wrap; }
+.opt-box .primary { background: #0a84ff; border-color: #0a84ff !important; color: #fff; }

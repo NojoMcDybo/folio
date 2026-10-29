@@ -1,5 +1,40 @@
-# Folio: PDF-Werkzeuge (Entwurf, offene Fragen unten)
+# Folio: PDF-Werkzeuge
 
+> **Stand: 0.9.0 – 0.13.0 umgesetzt** (Branch `claude/pdf-werkzeuge-plan`, nichts nach `main` gemerged, kein Tag gesetzt).
+> Der Entwurf weiter unten ist der ursprüngliche Plan; dieser Abschnitt sagt, was daraus geworden ist.
+
+| Phase | Stand | Geprüft |
+|---|---|---|
+| 0.9 Seitenleiste, Kontaktbogen, Ansichten, Lesezeichen | fertig | Browser (Chromium) |
+| 0.10 Seiten bearbeiten, Undo, Einfügen, Zusammenführen, Herausziehen | fertig | Browser mit echter Rust-Bibliothek; **nativer Drag unter Windows ungeprüft** |
+| 0.11 Texterkennung, Links, Kontextmenü, Inhaltsverzeichnis | fertig | Browser mit simulierter Erkennung; **Windows.Media.Ocr kompiliert, lief nie** |
+| 0.12 Unterschrift am Handy | fertig | Browser + echter Server + echte Handy-Seite |
+| 0.13 Verkleinern, Schwarzweiß, Einbrennen, Kommandozeile | fertig | Rust-Tests, Pixelvergleich mit poppler, Browser |
+
+**Was sich gegenüber dem Plan geändert hat**
+
+- Unterschrift: eigener Server in Folio statt Mitnutzung der Notch (Folio bleibt unabhängig). Die Unterschrift ist ein normaler
+  PDF.js-Stempel und lässt sich bis zum Sichern verschieben. „Einbrennen“ (0.13) macht sie endgültig.
+- Komprimieren/Schwarzweiß: Kommandozeile `folio --compress|--gray` (Variante 1 aus den Fragen); die Notch ruft sie auf
+  (`docs/notch-integration.md`, Patch liegt bei, das Notch-Repository selbst ist unberührt).
+- Neue Dokumente (Auszüge, Zusammengeführtes) landen in `Dokumente\Folio`.
+- Drehen und Zuschneiden brauchen keine neue Bibliothek im Frontend: `folio-pdfops` (Rust, lopdf) übernimmt sie, ebenso Text
+  einbetten, Bilder neu berechnen, Farben umschreiben und Einbrennen.
+- Beim Kommentieren bleibt Strg+Z beim Stift; Seiten-Undo gilt, solange nach der letzten Seitenoperation nichts gezeichnet wurde.
+- Tastenkürzel Drehen: Strg+, und Strg+. (Strg+[ ist auf deutschen Tastaturen nicht tippbar, Strg+R lädt WebView2 neu).
+
+**Offen / bekannte Grenzen**
+
+- Auf Windows nie gelaufen: OCR (`ocr.rs`), nativer Drag (`tauri-plugin-drag`), `Dokumente`-Ordner, Firewall-Abfrage des
+  Unterschriften-Servers, Notch-Patch. Alles kompiliert gegen das Windows-Ziel (`cargo check --target x86_64-pc-windows-gnu`).
+- Die Texterkennung wird beim Suchen (Strg+F) noch nicht durchsucht; erst nach „Erkannten Text einbetten“ + Sichern.
+- Schwarzweiß rechnet keine Muster, Verläufe und Sonderfarben um (Folio meldet das); Bilder in CMYK, JBIG2, CCITT, JPX bleiben.
+- Text „umschreiben“ (Fließtext ersetzen) ist bewusst nicht umgesetzt (siehe unten).
+- Nicht angefasst: Drucken, Passwort-PDFs, echtes Schwärzen – die Vorschläge 1, 2 und 6 stehen weiter aus.
+
+---
+
+## Ursprünglicher Entwurf
 Ausbau vom Reader zum Werkzeug. Grundlage ist der Stand auf GitHub `main` (0.8.4, Commit `491a773`). Abweichungen im lokalen Stand unter `D:\Dev\folio` sind hier nicht berücksichtigt.
 
 ## Was wir schon haben und was das ändert

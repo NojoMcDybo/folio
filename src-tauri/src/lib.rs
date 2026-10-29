@@ -114,6 +114,7 @@ pub fn run() {
             startup_file,
             pdf_tools::pdf_edit,
             pdf_tools::pdf_embed_text,
+            pdf_tools::pdf_optimize,
             ocr::ocr_page,
             sign::sign_start,
             sign::sign_status,
