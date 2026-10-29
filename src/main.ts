@@ -466,6 +466,7 @@ const ocr = new OcrLayer({
   say,
   busy: (waiting, page) => {
     window.clearTimeout(ocrChipTimer);
+    if (waiting < 0) { ocrChip.hidden = true; return; }
     if (waiting > 0) {
       ocrChip.textContent = page ? `Text wird erkannt … Seite ${page}${waiting > 1 ? ` (+${waiting - 1})` : ""}` : "Text wird erkannt …";
       ocrChip.hidden = false;
